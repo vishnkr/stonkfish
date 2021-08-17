@@ -4,6 +4,7 @@ import (
 	"github.com/holiman/uint256"
 	"stonkfish/bitboard"
 	"strconv"
+	//"fmt"
 	"strings"
 	"unicode"
 )
@@ -12,7 +13,7 @@ type Position struct {
 	Turn   int        // player number
 	Width  int        //columns
 	Height int        //rows
-	Pieces []PieceSet //white and black piece sets
+	Pieces []*PieceSet //white and black piece sets
 }
 
 func setBit(n *uint256.Int, pos uint) bitboard.Bitboard {
@@ -29,7 +30,7 @@ func clearBit(n *uint256.Int, pos uint) bitboard.Bitboard {
 	return n
 }
 
-func ConverFENtoPosition(fen string) *Position {
+func LoadPositionfromFEN(fen string) *Position {
 	var position *Position = &Position{}
 	position.Height, position.Width = getBoardDimensions(fen)
 	//var wLeftCastle, wRightCastle, bLeftCastle, bRightCastle bool = false,false,false,false
@@ -64,7 +65,7 @@ func ConverFENtoPosition(fen string) *Position {
 				}
 				continue
 			}
-			var index = bitboard.PosToIndex(row, col)
+			var bbIndex = bitboard.PosToIndex(row, col)
 			var bitboard bitboard.Bitboard
 			var pieceSet *PieceSet
 			if unicode.IsUpper(rune(char)) {
@@ -86,7 +87,8 @@ func ConverFENtoPosition(fen string) *Position {
 			case "p":
 				bitboard = pieceSet.Pawn.Bitboard
 			}
-			bitboard = setBit(bitboard,uint(index))
+			bitboard = setBit(bitboard,uint(bbIndex))
+			col+=1
 		case 1:
 			if string(char) == "w" {
 				position.Turn = 0
@@ -95,6 +97,7 @@ func ConverFENtoPosition(fen string) *Position {
 			}
 		}
 	}
+	position.Pieces = []*PieceSet{wPieceSet,bPieceSet}
 	return position
 }
 
