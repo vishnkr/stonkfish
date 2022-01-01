@@ -1,16 +1,14 @@
 
-mod utils;
+mod game;
 mod position;
-use utils::bitboard::{Bitboard,to_string};
-use position::{Position};
-mod evaluator;
-use evaluator::Evaluator;
-const WHITE:u8 =0;
-const BLACK:u8=1;
+use crate::game::evaluator;
+use crate::position::{Position};
+pub const WHITE:u8 =0;
+pub const BLACK:u8=1;
 
 fn main() {
-    //let bb = Bitboard::from(2147483646);//String::from("8/5p1k/8/p2p1P2/5q2/P1PbN2p/7P/2Q3K1 w - - 1 44");
-    //let bb_string = String::from("10/5p1k1/9/p2p1P3/5q3/P1PbN2p1/7P1/2Q3K2/10/10 w - - 1 44");//to_string(&bb);
-    let pos:Position = Position::new();
-    println!("{} {}",pos.dimensions.width,pos.dimensions.height);
+    let pos:&mut Position = &mut Position::load_from_fen("10/5p1k1/9/p2p1P3/5q3/P1PbN2p1/7P1/2Q3K2/10/10 w - - 1 44".to_string());
+    // let nmove = Move::new(13,2,MType::Regular);Move,MType,e
+    let evaluator:&mut evaluator::Evaluator = &mut evaluator::Evaluator::new();
+    println!("eval score {}",evaluator.perform_evaluation(pos) as f32 /evaluator::PAWN_CP_SCORE as f32);
 }
