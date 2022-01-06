@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 
-pub use crate::position::{Position,PieceSet,PieceType};
+pub use crate::engine::position::{Position,PieceSet,PieceType};
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;

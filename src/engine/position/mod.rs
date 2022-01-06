@@ -1,5 +1,5 @@
-use super::game::bitboard::{Bitboard,to_pos,to_string};
-
+use crate::engine::bitboard::{Bitboard,to_pos,to_string};
+use crate::engine::moves;
 
 pub enum PieceType{
     Pawn,
@@ -8,46 +8,34 @@ pub enum PieceType{
 	Rook,
 	Queen,
 	King,
-    Custom
+    Custom,
+}
+#[repr(u8)]
+pub enum Color{
+    WHITE,
+    BLACK
 }
 
 pub struct Piece{
     pub piece_type:PieceType,
     pub bitboard: Bitboard,
-    piece_repr: char,
+    pub piece_repr: char,
     pub player:u8
 }
 
 impl Piece{
-    pub fn new_pawn(player:u8)->Self{
-        let piece_repr:char = 'p';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::Pawn,bitboard,piece_repr,player}
-    }
-    pub fn new_knight(player:u8)->Self{
-        let piece_repr:char = 'n';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::Knight,bitboard,piece_repr,player}
-    }
-    pub fn new_bishop(player:u8)->Self{
-        let piece_repr:char = 'b';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::Bishop,bitboard,piece_repr,player}
-    }
-    pub fn new_king(player:u8)->Self{
-        let piece_repr:char = 'k';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::King,bitboard,piece_repr,player}
-    }
-    pub fn new_queen(player:u8)->Self{
-        let piece_repr:char = 'q';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::Queen,bitboard,piece_repr,player}
-    }
-    pub fn new_rook(player:u8)->Self{
-        let piece_repr:char = 'r';
-        let bitboard = Bitboard::zero();          
-        Piece{piece_type:PieceType::Rook,bitboard,piece_repr,player}
+    pub fn new_piece(player:u8, repr:char) -> Self{
+        let mut piece:Piece = Piece{bitboard:Bitboard::zero(),player:0,piece_repr:repr,piece_type:PieceType::Custom};
+        match repr{
+            'p'=> piece.piece_type = PieceType::Pawn,
+            'r'=> piece.piece_type = PieceType::Rook,
+            'k'=> piece.piece_type = PieceType::King,
+            'q'=> piece.piece_type = PieceType::Queen,
+            'b'=> piece.piece_type = PieceType::Bishop,
+            'n'=> piece.piece_type = PieceType::Knight,
+            _=>{}
+        }
+        piece
     }
 }
 
@@ -67,12 +55,29 @@ impl PieceSet{
     pub fn new(player:u8)->Self{
         PieceSet{
             player:player,
-            king: Piece::new_king(player),
-            queen: Piece::new_queen(player),
-            rook: Piece::new_rook(player),
-            bishop: Piece::new_bishop(player),
-            knight: Piece::new_knight(player),
-            pawn: Piece::new_pawn(player)
+            king: Piece::new_piece(player,'k'),
+            queen: Piece::new_piece(player,'q'),
+            rook: Piece::new_piece(player,'r'),
+            bishop: Piece::new_piece(player,'b'),
+            knight: Piece::new_piece(player,'k'),
+            pawn: Piece::new_piece(player,'p'),
+        }
+    }
+    pub fn get_piece_from_sq(&mut self,loc:usize)->Option<&mut Piece>{
+        if self.pawn.bitboard.bit(loc).unwrap(){
+            Some(&mut self.pawn)
+        } else if self.bishop.bitboard.bit(loc).unwrap(){
+            Some(&mut self.bishop)
+        } else if self.rook.bitboard.bit(loc).unwrap(){
+            Some(&mut self.rook)
+        } else if self.king.bitboard.bit(loc).unwrap(){
+            Some(&mut self.king)
+        } else if self.queen.bitboard.bit(loc).unwrap(){
+            Some(&mut self.queen)
+        } else if self.knight.bitboard.bit(loc).unwrap(){
+            Some(&mut self.knight)
+        }  else{
+            None
         }
     }
 }
@@ -80,6 +85,7 @@ impl PieceSet{
 pub struct Position{
     pub turn: u8,
     pub dimensions:Dimensions,
+    //ind-0: white set, ind-1: black set
     pub pieces: Vec<PieceSet>
 }
 
@@ -111,15 +117,15 @@ pub fn get_dimensions(fen_first_part:Vec<String>)-> Dimensions{
 
 impl Position{
 
-    pub fn new()->Position{
-        Position::load_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())
+    pub fn new(fen:String)->Position{
+        Position::load_from_fen(fen)
     }
     pub fn load_from_fen(fen:String) -> Position{
-        println!("Erg {}",fen.split_whitespace().nth(0).as_deref().unwrap_or("nop"));
+        //println!("Erg {}",fen.split_whitespace().nth(0).as_deref().unwrap_or("nop"));
         let board_data:String = fen.split(" ").collect(); //_whitespace().nth(0).as_deref().unwrap_or("nop");
         let dimensions:Dimensions = get_dimensions(board_data.split("/").map(|s| s.to_string()).collect());
-        let mut white_piece_set:PieceSet = PieceSet::new(crate::WHITE);
-        let mut black_piece_set:PieceSet = PieceSet::new(super::BLACK);
+        let mut white_piece_set:PieceSet = PieceSet::new(Color::WHITE as u8);
+        let mut black_piece_set:PieceSet = PieceSet::new(Color::BLACK as u8);
         let mut turn:u8 = 0;
         let mut fen_part = 0;
         let mut sec_digit = 0;
@@ -161,7 +167,7 @@ impl Position{
                             _=> continue
                         };
                         bitboard.set_bit(to_pos(row,col),true);
-                        println!("piece- {}",c);
+                        //println!("piece- {}",c);
                         to_string(&bitboard);
                         col+=1
                     }
@@ -187,12 +193,20 @@ impl Position{
         pieces.push(black_piece_set);
         Position{dimensions:dimensions,turn:turn,pieces:pieces}
     }
+
+    pub fn make_move(&mut self,turn:Color,mv:&moves::Move){
+        let src:usize = mv.parse_from();
+        let dest:usize = mv.parse_to();
+        let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();
+        piece.bitboard.set_bit(dest,true);
+        piece.bitboard.set_bit(src,false);
+    }
 }
 
 
 #[cfg(test)]
 mod position_tests{
-    /*use super::*;
+    use super::*;
     #[test]
     fn test_fen_to_position_conversion(){
         let fen:String = "12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string();
@@ -201,5 +215,5 @@ mod position_tests{
         let result: Position = Position::load_from_fen(fen);
         assert_eq!(result.dimensions,dimensions);
         assert_eq!(result.turn,turn);
-    }*/
+    }
 }
