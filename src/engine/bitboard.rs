@@ -21,6 +21,6 @@ pub fn to_string(bitboard:&Bitboard)->String{
         }
         bb_string.push_str("\n");
     }
-    //println!("{}",bb_string);
+    println!("{}",bb_string);
     bb_string
 }

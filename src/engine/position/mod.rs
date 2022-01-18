@@ -168,7 +168,7 @@ impl Position{
                         };
                         bitboard.set_bit(to_pos(row,col),true);
                         //println!("piece- {}",c);
-                        to_string(&bitboard);
+                        //to_string(&bitboard);
                         col+=1
                     }
                 }

@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 numext-fixed-uint = "0.1.6"
 derive-new = "0.5.9"
+arrayvec="0.7.2"
