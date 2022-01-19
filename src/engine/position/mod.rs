@@ -121,17 +121,16 @@ impl Position{
         Position::load_from_fen(fen)
     }
     pub fn load_from_fen(fen:String) -> Position{
-        //println!("Erg {}",fen.split_whitespace().nth(0).as_deref().unwrap_or("nop"));
-        let board_data:String = fen.split(" ").collect(); //_whitespace().nth(0).as_deref().unwrap_or("nop");
+        let board_data:String = fen.split(" ").collect();
         let dimensions:Dimensions = get_dimensions(board_data.split("/").map(|s| s.to_string()).collect());
         let mut white_piece_set:PieceSet = PieceSet::new(Color::WHITE as u8);
         let mut black_piece_set:PieceSet = PieceSet::new(Color::BLACK as u8);
-        let mut turn:u8 = 0;
+        let mut turn = 0;
         let mut fen_part = 0;
         let mut sec_digit = 0;
-        let mut col:u8 = 0;
+        let mut col = 0;
         let mut row = 0;
-        let mut count:u32;
+        let mut count;
         let mut _castle_white_kingside = false;
         let mut _castle_white_queenside = false;
         let mut _castle_black_kingside = false;
