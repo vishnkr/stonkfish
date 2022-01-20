@@ -200,6 +200,14 @@ impl Position{
         piece.bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(src,false);
     }
+
+    pub fn unmake_move(&mut self,turn:Color,mv:&moves::Move){
+        let src:usize = mv.parse_from();
+        let dest:usize = mv.parse_to();
+        let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();
+        piece.bitboard.set_bit(src,true);
+        piece.bitboard.set_bit(dest,false);
+    }
 }
 
 
