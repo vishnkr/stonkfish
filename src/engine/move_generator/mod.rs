@@ -1,11 +1,11 @@
 use crate::engine::moves::{Move};
-use crate::engine::position::{Color,PieceSet,Dimensions,Position};
-use crate::engine::bitboard::*;
+use crate::engine::position::*;
+use crate::engine::bitboard::{Bitboard,to_pos,to_string};
 use std::vec::Vec;
 use arrayvec::ArrayVec;
-use std::ops::Index;
-//Attack - Defend Map or Attack table
-pub struct AttackMap{
+
+//Attack - Defend Map or Attack table, precalculated for standard pieces
+pub struct AttackTable{
     knight_attacks: ArrayVec::<Bitboard,256>,
     bishop_masks:ArrayVec::<Bitboard,256>,
     rook_masks:ArrayVec::<Bitboard,256>,
@@ -14,7 +14,7 @@ pub struct AttackMap{
     //masked_knight_attacks: ArrayVec::<Bitboard,256>
 }
 pub struct MoveGenerator{
-    at_map: AttackMap,
+    attack_table: AttackTable,
 }
 pub enum SlideDirs{
     North,
@@ -28,7 +28,7 @@ pub enum SlideDirs{
 }
 
 
-impl AttackMap{
+impl AttackTable{
     pub fn new(dimensions:Dimensions)->Self{
         let mut knight_attacks = ArrayVec::<Bitboard,256>::new();
         let mut rook_masks = ArrayVec::<Bitboard,256>::new();
@@ -38,7 +38,6 @@ impl AttackMap{
         let width = dimensions.width as i8;
         let height = dimensions.height as i8;
         
-        //mask knight moves
         let knight_offsets:[(i8,i8);8] = [(2,1),(2,-1),(-2,1),(-2,-1),(1,2),(1,-2),(-1,2),(-1,-2)];
         let king_offsets:[(i8,i8);8] = [(0,1),(0,-1),(1,0),(-1,0),(1,-1),(-1,1),(1,1),(-1,-1)];
         for i in 0..16{
@@ -50,14 +49,14 @@ impl AttackMap{
                 knight_attacks.push(Bitboard::zero());
                 pawn_attacks[Color::BLACK as usize].push(Bitboard::zero());
                 pawn_attacks[Color::WHITE as usize].push(Bitboard::zero());
-                AttackMap::mask_slide(i,j, width,height,&mut rook_masks[square],&[SlideDirs::North,SlideDirs::South,SlideDirs::East,SlideDirs::West]);
-                AttackMap::mask_slide(i,j, width,height,&mut bishop_masks[square],&[SlideDirs::NorthEast,SlideDirs::NorthWest,SlideDirs::SouthEast,SlideDirs::SouthWest]);
-                AttackMap::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
-                AttackMap::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
-                AttackMap::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
+                Self::mask_slide(i,j, width,height,&mut rook_masks[square],&[SlideDirs::North,SlideDirs::South,SlideDirs::East,SlideDirs::West]);
+                Self::mask_slide(i,j, width,height,&mut bishop_masks[square],&[SlideDirs::NorthEast,SlideDirs::NorthWest,SlideDirs::SouthEast,SlideDirs::SouthWest]);
+                Self::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
+                Self::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
+                Self::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
             }
         }
-        AttackMap{
+        Self {
             knight_attacks,
             bishop_masks,
             rook_masks,
@@ -66,6 +65,18 @@ impl AttackMap{
         }
     }
 
+    pub fn get_king_attacks(&self,position:usize)->Bitboard{
+        self.king_attacks[position].to_owned()
+    }
+    pub fn get_knight_attacks(&self,position:usize)->Bitboard{
+        self.knight_attacks[position].to_owned()
+    }
+    pub fn get_bishop_attacks(&self,position:usize)->Bitboard{
+        self.bishop_masks[position].to_owned()
+    }
+    pub fn get_rook_attacks(&self,position:usize)->Bitboard{
+        self.rook_masks[position].to_owned()
+    }
     pub fn mask_jump(x:i8,y:i8,width:i8,height:i8,offsets:&[(i8,i8)],bb:&mut Bitboard){
         for dir in offsets{
             let new_x = x as i8 +dir.0;
@@ -120,14 +131,34 @@ impl AttackMap{
 }
 
 impl MoveGenerator{
-    pub fn new()->MoveGenerator{
-        MoveGenerator{at_map:AttackMap::new(Dimensions{width:10,height:10})}
+    pub fn new(dimensions:Dimensions)->MoveGenerator{
+        Self{attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height})}
     }
 
-    pub fn generate_moves(&self,cur_position:&mut Position)->Vec<Move>{
+    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)->Vec<Move>{
         let moves = Vec::new();
-        let _piece_set: &PieceSet = &cur_position.pieces[cur_position.turn as usize];
+        let piece_set = &cur_position.pieces[cur_position.turn as usize].as_array();
+        //&cur_position.pieces[cur_position.turn as usize];
+        for x in 0..cur_position.dimensions.width{
+            for y in 0..cur_position.dimensions.height{
+                for piece in piece_set{
+                    if piece.bitboard == Bitboard::zero() {continue}
+                    let position:usize = piece.bitboard.lowest_one().unwrap() as usize;
+                    let attack_bb: Bitboard = match piece.piece_type{
+                        PieceType::King =>{self.attack_table.get_king_attacks(position)}
+                        PieceType::Bishop =>{self.attack_table.get_bishop_attacks(position)}
+                        PieceType::Rook =>{self.attack_table.get_rook_attacks(position)}
+                        PieceType::Queen =>{self.attack_table.get_bishop_attacks(position) | self.attack_table.get_rook_attacks(position)}
+                        PieceType::Knight =>{self.attack_table.get_knight_attacks(position)}
+                        _ => self.attack_table.get_knight_attacks(position),
+                    };
+                    break;
+                }
+            }
+        }
+        
         moves
+        
     }
 }
 
@@ -137,15 +168,15 @@ mod movegen_tests{
     use crate::engine::bitboard::{to_string};
     #[test]
     pub fn test_knight_attack_masks(){
-        let at_map = AttackMap::new(Dimensions{width:10,height:10});
+        let at_map = AttackTable::new(Dimensions{width:10,height:10});
         //to_string(&at_map.knight_attacks[65]);
-        to_string(&at_map.pawn_attacks[1][18]);
+        to_string(&at_map.pawn_attacks[1][22]);
         to_string(&at_map.pawn_attacks[0][22]);
     }
 
     #[test]
     pub fn test_rook_attack_masks(){
-        let at_map = AttackMap::new(Dimensions{width:7,height:7});
+        let at_map = AttackTable::new(Dimensions{width:7,height:7});
         to_string(&at_map.rook_masks[17]);
         to_string(&at_map.bishop_masks[16]);
         to_string(&at_map.king_attacks[5]);
