@@ -1,6 +1,7 @@
 use crate::engine::bitboard::{Bitboard,to_pos,to_string};
 use crate::engine::moves;
 
+#[derive(Copy, Clone)]
 pub enum PieceType{
     Pawn,
 	Knight,
@@ -10,11 +11,13 @@ pub enum PieceType{
 	King,
     Custom,
 }
-#[repr(u8)]
+
+#[derive(Copy, Clone,PartialEq,Debug)]
 pub enum Color{
     WHITE,
     BLACK
 }
+
 
 pub struct Piece{
     pub piece_type:PieceType,
@@ -22,7 +25,6 @@ pub struct Piece{
     pub piece_repr: char,
     pub player:u8
 }
-
 impl Piece{
     pub fn new_piece(player:u8, repr:char) -> Self{
         let mut piece:Piece = Piece{bitboard:Bitboard::zero(),player:0,piece_repr:repr,piece_type:PieceType::Custom};
@@ -33,7 +35,7 @@ impl Piece{
             'q'=> piece.piece_type = PieceType::Queen,
             'b'=> piece.piece_type = PieceType::Bishop,
             'n'=> piece.piece_type = PieceType::Knight,
-            _=>{}
+            _=> piece.piece_type = PieceType::Custom,
         }
         piece
     }
@@ -49,6 +51,7 @@ pub struct PieceSet{
     pub knight:Piece,
     pub pawn:Piece,
     //custom:Vec<Piece>
+    
 }
 
 impl PieceSet{
@@ -62,6 +65,9 @@ impl PieceSet{
             knight: Piece::new_piece(player,'k'),
             pawn: Piece::new_piece(player,'p'),
         }
+    }
+    pub fn as_array(&self) -> [&Piece; 6] {
+        return [&self.king, &self.pawn, &self.bishop,&self.queen,&self.rook,&self.knight]
     }
     pub fn get_piece_from_sq(&mut self,loc:usize)->Option<&mut Piece>{
         if self.pawn.bitboard.bit(loc).unwrap(){
@@ -83,13 +89,13 @@ impl PieceSet{
 }
 
 pub struct Position{
-    pub turn: u8,
+    pub turn: Color,
     pub dimensions:Dimensions,
     //ind-0: white set, ind-1: black set
     pub pieces: Vec<PieceSet>
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub struct Dimensions{
     pub height: u8,
     pub width: u8
@@ -125,7 +131,7 @@ impl Position{
         let dimensions:Dimensions = get_dimensions(board_data.split("/").map(|s| s.to_string()).collect());
         let mut white_piece_set:PieceSet = PieceSet::new(Color::WHITE as u8);
         let mut black_piece_set:PieceSet = PieceSet::new(Color::BLACK as u8);
-        let mut turn = 0;
+        let mut turn = Color::WHITE;
         let mut fen_part = 0;
         let mut sec_digit = 0;
         let mut col = 0;
@@ -172,8 +178,8 @@ impl Position{
                     }
                 }
                 1=>{
-                    if c=='w' {turn=0;}
-                    else{turn=1;}
+                    if c=='w' {turn=Color::WHITE;}
+                    else{turn=Color::BLACK;}
                 }
                 2=>{
                     match c {
@@ -218,7 +224,7 @@ mod position_tests{
     fn test_fen_to_position_conversion(){
         let fen:String = "12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string();
         let dimensions:Dimensions = Dimensions{width:12,height:12};
-        let turn:u8=0;
+        let turn:Color= Color::WHITE;
         let result: Position = Position::load_from_fen(fen);
         assert_eq!(result.dimensions,dimensions);
         assert_eq!(result.turn,turn);

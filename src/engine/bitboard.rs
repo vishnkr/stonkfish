@@ -1,12 +1,10 @@
 use numext_fixed_uint::U256;
 
-
 pub type Bitboard = U256;
 
 pub fn to_pos(x:u8,y:u8) -> usize{
     ((x*16)+y).into()
 }
-
 
 pub fn to_string(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();

@@ -14,10 +14,11 @@ pub struct Engine{
 
 impl Engine{
     pub fn new(fen:String)->Engine{
+        let position : Position = Position::new(fen);
         Engine{
-            move_generator: move_generator::MoveGenerator::new(),
+            move_generator: move_generator::MoveGenerator::new(position.dimensions.clone()),
             evaluator: evaluator::Evaluator::new(),
-            position: Position::new(fen)
+            position: position,
         }
     }
 

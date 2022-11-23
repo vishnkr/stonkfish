@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
-
+use arrayvec::ArrayVec;
 pub use crate::engine::position::{Position,PieceSet,PieceType};
+pub use crate::engine::move_generator::{SlideDirs};
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
@@ -9,7 +10,7 @@ const KNIGHT_CP_SCORE:isize = 300;
 const BISHOP_CP_SCORE:isize = 350;
 const ROOK_CP_SCORE:isize = 500;
 const QUEEN_CP_SCORE:isize = 900;
-
+const DIAGONAL_SCORE:isize = 90;
 
 pub struct Evaluator{
     piece_sq_table: HashMap<PieceType,Vec<usize>,RandomState>
@@ -34,9 +35,17 @@ impl Evaluator{
         let mut total_score = 0;
         for piece_set in position.pieces.iter(){
             println!("ts {}",self.calc_material_score(piece_set));
-            if position.turn==piece_set.player { total_score += self.calc_material_score(piece_set);}
+            if position.turn as u8 ==piece_set.player { total_score += self.calc_material_score(piece_set);}
             else { total_score -= self.calc_material_score(piece_set);}
         }
         total_score
+    }
+
+    pub fn calc_custom_material_value(&mut self,piece_repr:char,
+        jump_offsets:ArrayVec<ArrayVec<i8,0>,0>,
+        slide_dirs: &[SlideDirs],
+    )->isize{
+        let material_score = 0;
+        material_score
     }
 }
