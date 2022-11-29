@@ -21,13 +21,13 @@ impl Move{
         Move(
             (((0 | (src as u32))<< 16u32) | (dest as u32) << 8u32)| 
             match mtype {
-                MType::Quiet => {0},
-                MType::Capture => {1u32},
-                MType::Promote => {2u32},
-                MType::KingSideCastle => {3u32},
-                MType::QueenSideCastle => {4u32},
-                MType::DoublePawnPush => {5u32},
-                MType::EnPassant => {6u32}
+                MType::Quiet => 0,
+                MType::Capture => 1u32,
+                MType::Promote => 2u32,
+                MType::KingSideCastle => 3u32,
+                MType::QueenSideCastle => 4u32,
+                MType::DoublePawnPush => 5u32,
+                MType::EnPassant => 6u32
             }).into()
     }
     pub fn make_move(&self){

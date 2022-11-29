@@ -1,5 +1,7 @@
+use core::fmt;
+
 use crate::engine::bitboard::{Bitboard,to_pos,to_string};
-use crate::engine::moves;
+use crate::engine::move_generator::moves::*;
 
 #[derive(Copy, Clone)]
 pub enum PieceType{
@@ -10,6 +12,20 @@ pub enum PieceType{
 	Queen,
 	King,
     Custom,
+}
+
+impl fmt::Debug for PieceType{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
+        match *self {
+            PieceType::Pawn => write!(f,"Pawn"),
+            PieceType::Knight => write!(f,"Knight"),
+            PieceType::Bishop => write!(f,"Bishop"),
+            PieceType::Queen => write!(f,"Queen"),
+            PieceType::Rook => write!(f,"Rook"),
+            PieceType::King => write!(f,"King"),
+            PieceType::Custom => write!(f,"Custom"),
+        }
+    }
 }
 
 #[derive(Copy, Clone,PartialEq,Debug)]
@@ -50,6 +66,7 @@ pub struct PieceSet{
     pub bishop:Piece,
     pub knight:Piece,
     pub pawn:Piece,
+    pub all_pieces: Bitboard,
     //custom:Vec<Piece>
     
 }
@@ -64,6 +81,7 @@ impl PieceSet{
             bishop: Piece::new_piece(player,'b'),
             knight: Piece::new_piece(player,'k'),
             pawn: Piece::new_piece(player,'p'),
+            all_pieces: Bitboard::zero(),
         }
     }
     pub fn as_array(&self) -> [&Piece; 6] {
@@ -92,7 +110,8 @@ pub struct Position{
     pub turn: Color,
     pub dimensions:Dimensions,
     //ind-0: white set, ind-1: black set
-    pub pieces: Vec<PieceSet>
+    pub pieces: Vec<PieceSet>,
+    pub position_bitboard: Bitboard
 }
 
 #[derive(Debug,PartialEq,Clone)]
@@ -161,7 +180,7 @@ impl Position{
                             sec_digit=0;
                         }
                     } else {
-                        
+                        let all_pieces_bb: &mut Bitboard = if c.is_ascii_lowercase(){&mut white_piece_set.all_pieces} else {&mut black_piece_set.all_pieces};
                         let bitboard: &mut Bitboard = match c.to_ascii_lowercase(){
                             'p'=> if c.is_ascii_lowercase(){&mut white_piece_set.pawn.bitboard} else {&mut black_piece_set.pawn.bitboard}
                             'k'=> if c.is_ascii_lowercase(){&mut white_piece_set.king.bitboard} else {&mut black_piece_set.king.bitboard}
@@ -171,7 +190,9 @@ impl Position{
                             'q'=> if c.is_ascii_lowercase(){&mut white_piece_set.queen.bitboard} else {&mut black_piece_set.queen.bitboard}
                             _=> continue
                         };
-                        bitboard.set_bit(to_pos(row,col),true);
+                        let pos = to_pos(row,col);
+                        bitboard.set_bit(pos,true);
+                        all_pieces_bb.set_bit(pos,true);
                         //println!("piece- {}",c);
                         //to_string(&bitboard);
                         col+=1
@@ -194,12 +215,17 @@ impl Position{
             }
         }
         let mut pieces = Vec::new();
+        let position_bitboard = Bitboard::zero() | &white_piece_set.all_pieces | &black_piece_set.all_pieces;
         pieces.push(white_piece_set);
         pieces.push(black_piece_set);
-        Position{dimensions:dimensions,turn:turn,pieces:pieces}
+        Position{dimensions:dimensions,turn:turn,pieces:pieces,position_bitboard:position_bitboard }
     }
 
-    pub fn make_move(&mut self,turn:Color,mv:&moves::Move){
+    pub fn get_opponent_position_bb(&self)-> Bitboard{
+        return &self.position_bitboard & !&self.pieces[self.turn as usize].all_pieces;
+    }
+
+    pub fn make_move(&mut self,turn:Color,mv:&Move){
         let src:usize = mv.parse_from();
         let dest:usize = mv.parse_to();
         let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();
@@ -207,7 +233,7 @@ impl Position{
         piece.bitboard.set_bit(src,false);
     }
 
-    pub fn unmake_move(&mut self,turn:Color,mv:&moves::Move){
+    pub fn unmake_move(&mut self,turn:Color,mv:&Move){
         let src:usize = mv.parse_from();
         let dest:usize = mv.parse_to();
         let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();

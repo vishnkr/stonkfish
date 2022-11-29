@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 use arrayvec::ArrayVec;
 pub use crate::engine::position::{Position,PieceSet,PieceType};
-pub use crate::engine::move_generator::{SlideDirs};
+pub use crate::engine::move_generator::{SlideDirection};
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
@@ -43,7 +43,7 @@ impl Evaluator{
 
     pub fn calc_custom_material_value(&mut self,piece_repr:char,
         jump_offsets:ArrayVec<ArrayVec<i8,0>,0>,
-        slide_dirs: &[SlideDirs],
+        slide_dirs: &[SlideDirection],
     )->isize{
         let material_score = 0;
         material_score
