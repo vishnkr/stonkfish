@@ -12,7 +12,8 @@ pub struct AttackTable{
     knight_attacks: ArrayVec::<Bitboard,256>,
     king_attacks:ArrayVec::<Bitboard,256>,
     pawn_attacks:[ArrayVec::<Bitboard,256>;2],
-    slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>
+    slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
+    occupancy_lookup: Vec<Vec<u16>>
 }
 pub struct MoveGenerator{
     attack_table: AttackTable,
@@ -54,28 +55,73 @@ impl AttackTable{
                 knight_attacks.push(Bitboard::zero());
                 pawn_attacks[Color::BLACK as usize].push(Bitboard::zero());
                 pawn_attacks[Color::WHITE as usize].push(Bitboard::zero());
-                //Self::mask_slides(i,j, width,height,&mut rook_masks[square],&[SlideDirection::North,SlideDirection::South,SlideDirection::East,SlideDirection::West]);
-                //Self::mask_slides(i,j, width,height,&mut bishop_masks[square],&[SlideDirection::NorthEast,SlideDirection::NorthWest,SlideDirection::SouthEast,SlideDirection::SouthWest]);
                 Self::mask_slide(i, j,width,height,&dirs,&mut slide_attacks,square);
                 Self::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
                 Self::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
                 Self::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
             }
         }
+        let occupancy_lookup = Self::gen_occupancy_lookup();
+
         Self {
             knight_attacks,
             king_attacks,
             pawn_attacks,
-            slide_attacks
+            slide_attacks,
+            occupancy_lookup
         }
+    }
+    
+    pub fn gen_occupancy_lookup()->Vec<Vec<u16>>{
+        fn get_rank_attacks(is_right:bool,pos:u16)->u16{
+            if is_right{
+                if pos != 0 {
+                    return pos-1
+                }
+                return 0u16
+            }
+            !pos & !get_rank_attacks(true,pos)
+        };
+
+        const TOTAL_OCCUPANCY_POSSIBILITES:u16 = u16::MAX;
+        let mut occupancy_lookup = vec![vec![0; TOTAL_OCCUPANCY_POSSIBILITES.into()];16];
+
+        for file in 0..16{
+            for occupancy in 0..TOTAL_OCCUPANCY_POSSIBILITES{
+                // src position of piece in a rank
+                let piece_sq = (1<<file) as u16;
+                // all attacked bits/files in each direction are set
+
+                let mut right_attacks = get_rank_attacks(true,piece_sq);
+                let mut left_attacks = get_rank_attacks(false,piece_sq);
+                // set only the occupied bits in each direction
+                let right_occ = right_attacks & occupancy;
+                let left_occ = left_attacks & occupancy;
+                if right_occ!=0{
+                    let closest_right_blocker:u16 = 1 << (15-right_occ.leading_zeros());
+                    right_attacks ^= get_rank_attacks(true,closest_right_blocker);
+                }
+                if left_occ!=0{
+                    let closest_left_blocker:u16 = 1 << left_occ.trailing_zeros();
+                    left_attacks ^= get_rank_attacks(false,closest_left_blocker);
+                }
+                
+
+                occupancy_lookup[file][occupancy as usize] = left_attacks ^ right_attacks;
+            }
+        }
+        
+        occupancy_lookup
     }
 
     pub fn get_king_attacks(&self,position:usize)->Bitboard{
         self.king_attacks[position].to_owned()
     }
+
     pub fn get_knight_attacks(&self,position:usize)->Bitboard{
         self.knight_attacks[position].to_owned()
     }
+
     pub fn get_bishop_attacks(&self,position:usize)->Bitboard{
         let dirs = [SlideDirection::NorthWest,SlideDirection::SouthWest,SlideDirection::NorthEast,SlideDirection::SouthEast];
         let mut bb = Bitboard::zero();
@@ -92,6 +138,7 @@ impl AttackTable{
         }
         bb
     }
+
     pub fn mask_jump(x:i8,y:i8,width:i8,height:i8,offsets:&[(i8,i8)],bb:&mut Bitboard){
         for dir in offsets{
             let new_x = x as i8 +dir.0;
@@ -129,6 +176,7 @@ impl AttackTable{
         }
         hashmap
     }
+
     pub fn mask_slide(x:i8,y:i8,width:i8,height:i8,dirs:&Vec<SlideDirection>,hashmap:&mut HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,square:usize){
         let mut dx:i8;
         let mut dy:i8;
@@ -160,31 +208,6 @@ impl AttackTable{
         }
     }
 
-    pub fn mask_slides(x:i8,y:i8,width:i8,height:i8,bb:&mut Bitboard,dirs:&[SlideDirection]){
-        let mut dx:i8;
-        let mut dy:i8;
-        for dir in dirs{
-            match dir{
-                SlideDirection::NorthEast=>{dx=-1;dy=1;}
-                SlideDirection::SouthEast=>{dx=1;dy=1;}
-                SlideDirection::NorthWest=>{dx=-1;dy=-1;}
-                SlideDirection::SouthWest=>{dx=1;dy=-1;}
-                SlideDirection::North=>{dx=-1;dy=0;}
-                SlideDirection::East=>{dx=0;dy=1;}
-                SlideDirection::South=>{dx=1;dy=0;}
-                SlideDirection::West=>{dx=0;dy=-1;}
-            }
-            let mut newx = x+dx;
-            let mut newy = y+dy;
-            loop {
-                if newx<0 || newy<0 || newx>width-1 || newy>height-1{break;}
-                let square = to_pos(newx as u8, newy as u8);
-                bb.set_bit(square,true);
-                newx+=dx;
-                newy+=dy;
-            }
-        }
-    }
 }
 
 impl MoveGenerator{
@@ -230,6 +253,8 @@ impl MoveGenerator{
         moves
         
     }
+
+    
 }
 
 #[cfg(test)]
@@ -237,11 +262,10 @@ mod movegen_tests{
     use super::*;
     use crate::engine::bitboard::{to_string};
     #[test]
-    pub fn test_knight_attack_masks(){
-        let at_map = AttackTable::new(Dimensions{width:10,height:10});
-        //to_string(&at_map.knight_attacks[65]);
-        to_string(&at_map.pawn_attacks[1][22]);
-        to_string(&at_map.pawn_attacks[0][22]);
+    pub fn test_rank_attack_occupancy_lookup(){
+        let occupancy_lookup:Vec<Vec<u16>> = AttackTable::gen_occupancy_lookup();
+        assert_eq!(occupancy_lookup[4][0b01010101],0b01101100);
+        assert_eq!(occupancy_lookup[0][0b01010101],0b0110);
     }
 
     #[test]
