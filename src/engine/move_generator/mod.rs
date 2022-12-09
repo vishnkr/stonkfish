@@ -1,10 +1,11 @@
 use moves::*;
+use numext_fixed_uint::u256;
 use crate::engine::position::*;
-use crate::engine::bitboard::{Bitboard,to_pos,to_string};
+use crate::engine::bitboard::*;
 use std::vec::Vec;
 use arrayvec::ArrayVec;
 use std::collections::HashMap;
-use self::move_mask::MoveMask;
+//use self::move_mask::MoveMask;
 pub mod moves;
 pub mod move_mask;
 //Attack - Defend Map or Attack table, precalculated for standard pieces
@@ -13,10 +14,21 @@ pub struct AttackTable{
     king_attacks:ArrayVec::<Bitboard,256>,
     pawn_attacks:[ArrayVec::<Bitboard,256>;2],
     slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
-    occupancy_lookup: Vec<Vec<u16>>
+    occupancy_lookup: Vec<Vec<u16>>,
+    files: Vec<Bitboard>,
+    ranks: Vec<Bitboard>,
+    main_diagonal: Bitboard,
+    anti_diagonal: Bitboard,
 }
 pub struct MoveGenerator{
     attack_table: AttackTable,
+}
+
+// contains bitboard with all possible moves for a piece which can be iterated to get a list of moves
+pub struct MoveMask{
+    pub bitboard: Bitboard,
+    pub src: usize,
+    pub piece_type: PieceType,
 }
 
 #[derive(PartialEq,Eq,Hash,Copy,Clone)]
@@ -43,15 +55,14 @@ impl AttackTable{
         let mut slide_attacks:HashMap<SlideDirection, ArrayVec::<Bitboard,256>> = Self::init_slide_hashmap(&dirs);
         let width = dimensions.width as i8;
         let height = dimensions.height as i8;
-        
+        let mut files = vec![Bitboard::zero();16];
+        let mut ranks = vec![Bitboard::zero();16];
         let knight_offsets:[(i8,i8);8] = [(2,1),(2,-1),(-2,1),(-2,-1),(1,2),(1,-2),(-1,2),(-1,-2)];
         let king_offsets:[(i8,i8);8] = [(0,1),(0,-1),(1,0),(-1,0),(1,-1),(-1,1),(1,1),(-1,-1)];
         for i in 0..16{
             for j in 0..16{
                 let square = to_pos(i as u8, j as u8);
                 king_attacks.push(Bitboard::zero());
-                //rook_masks.push(Bitboard::zero());
-                //bishop_masks.push(Bitboard::zero());
                 knight_attacks.push(Bitboard::zero());
                 pawn_attacks[Color::BLACK as usize].push(Bitboard::zero());
                 pawn_attacks[Color::WHITE as usize].push(Bitboard::zero());
@@ -59,16 +70,23 @@ impl AttackTable{
                 Self::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
                 Self::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
                 Self::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
+                files[j as usize].set_bit(square,true);
+                ranks[i as usize].set_bit(square,true);
             }
         }
         let occupancy_lookup = Self::gen_occupancy_lookup();
-
+        let main_diagonal = &slide_attacks.get(&SlideDirection::SouthWest).unwrap()[15] | &slide_attacks.get(&SlideDirection::NorthEast).unwrap()[240];
+        let anti_diagonal = &slide_attacks.get(&SlideDirection::SouthEast).unwrap()[0] | &slide_attacks.get(&SlideDirection::NorthWest).unwrap()[255];
         Self {
             knight_attacks,
             king_attacks,
             pawn_attacks,
             slide_attacks,
-            occupancy_lookup
+            occupancy_lookup,
+            files,
+            ranks,
+            main_diagonal,
+            anti_diagonal
         }
     }
     
@@ -114,6 +132,31 @@ impl AttackTable{
         occupancy_lookup
     }
 
+    //TODO: split rank and file slide attacks further for each of the 8 directions for custom move patterns
+    pub fn get_rank_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
+        let mut rank_attack = self.occupancy_lookup[file][occupancy];
+        let mut rank_attack_bb = Bitboard::zero();
+        rank_attack_bb |= rank_attack;
+        rank_attack_bb << rank
+    }   
+
+    pub fn get_file_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
+        let mut rank_attack = self.occupancy_lookup[file][occupancy];
+        let mut rank_attack_bb = Bitboard::zero();
+        rank_attack_bb |= rank_attack;
+        rank_attack_bb << rank
+    }   
+
+    pub fn get_file(&self,pos:u8)->Bitboard{
+        let file = to_col(pos) as usize;
+        self.files[file].to_owned()
+    }
+
+    pub fn get_rank(&self,pos:u8)->Bitboard{
+        let rank = to_row(pos) as usize;
+        self.ranks[rank].to_owned()
+    }
+
     pub fn get_king_attacks(&self,position:usize)->Bitboard{
         self.king_attacks[position].to_owned()
     }
@@ -130,6 +173,7 @@ impl AttackTable{
         }
         bb
     }
+
     pub fn get_rook_attacks(&self,position:usize)->Bitboard{
         let dirs = [SlideDirection::North,SlideDirection::South,SlideDirection::East,SlideDirection::West];
         let mut bb = Bitboard::zero();
@@ -203,9 +247,19 @@ impl AttackTable{
                 newx+=dx;
                 newy+=dy;
             }
-            to_string(&bb);
-
         }
+    }
+
+    pub fn map_file_to_first_rank(&self,bb:&Bitboard,pos:u8)->Bitboard{
+       let file = to_col(pos);
+       let mut mask_a_file = (&self.files[file as usize] & bb)>> file;
+       let (mut masked_with_diagonal,_valid) = mask_a_file.overflowing_mul(&self.main_diagonal);
+       &masked_with_diagonal >> (240)
+    }
+
+    pub fn map_main_diagonal_to_first_rank(&self,pos:u8){
+
+
     }
 
 }
@@ -215,15 +269,13 @@ impl MoveGenerator{
         Self{attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height})}
     }
 
-    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)->Vec<Move>{
-        let moves = Vec::new();
-        let piece_set = &cur_position.pieces[cur_position.turn as usize].as_array();
-        let opponent_bb: Bitboard = cur_position.get_opponent_position_bb();
-
-        let gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|->MoveMask {
-            let mut final_bb = Bitboard::zero();
-            let mut pos:usize = 0;
+    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)->(Vec<MoveMask>,Bitboard){
+        let mut move_masks :Vec<MoveMask> = Vec::new();
+        let opponent_bb: Bitboard = cur_position.get_opponent_position_bb().clone();
+        let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|{
             while !piece_bitboard.is_zero(){
+                let mut final_bb = Bitboard::zero();
+                let mut pos:usize = 0;
                 pos = piece_bitboard.lowest_one().unwrap();
                 let mut attack_bb = match piece_type{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
@@ -234,23 +286,27 @@ impl MoveGenerator{
                     _ => self.attack_table.get_king_attacks(pos),
                 };
                 
-                attack_bb &= !&cur_position.pieces[cur_position.turn as usize].all_pieces;
+                attack_bb &= !&cur_position.pieces[cur_position.turn as usize].occupied;
                 final_bb |= &attack_bb;
                 
                 piece_bitboard.set_bit(pos,false);
+
+                move_masks.push(
+                    MoveMask{
+                    bitboard:final_bb,
+                    src:pos,
+                    piece_type,
+                });
             }
-            MoveMask{
-                bitboard:final_bb,
-                src:pos,
-                piece_type,
-                //opponent_bb:&opponent_bb,
-            }
+            
         };
+
+        let piece_set = &cur_position.pieces[cur_position.turn as usize].as_array();
         for piece in piece_set{
             gen_piece_moves_bb(piece.piece_type,(&piece.bitboard).to_owned());
         }
         
-        moves
+        (move_masks,opponent_bb)
         
     }
 
@@ -270,9 +326,16 @@ mod movegen_tests{
 
     #[test]
     pub fn print_helper_test(){
-        let mvgen = MoveGenerator::new(Dimensions{width:8,height:8});
+        /*let mvgen = MoveGenerator::new(Dimensions{width:8,height:8});
         let mut position = Position::load_from_fen("8/ppp1p1pp/8/8/2Q3R1/4R3/8/4K3 b - - 0 1".to_string());
         mvgen.generate_pseudolegal_moves(&mut position);
+        */
+        let at = AttackTable::new(Dimensions { height: 16, width: 16 });
+        let bb = &at.get_rook_attacks(21);
+        let bb2 = at.map_file_to_first_rank(bb,21);
+        to_string(&(bb));
+        to_string(&(bb2));
+
     }
 
 }

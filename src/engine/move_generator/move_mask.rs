@@ -5,5 +5,4 @@ pub struct MoveMask{
     pub bitboard: Bitboard,
     pub src: usize,
     pub piece_type: PieceType,
-    //opponent_bb : Bitboard,
 }

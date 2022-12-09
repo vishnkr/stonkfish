@@ -66,7 +66,7 @@ pub struct PieceSet{
     pub bishop:Piece,
     pub knight:Piece,
     pub pawn:Piece,
-    pub all_pieces: Bitboard,
+    pub occupied: Bitboard,
     //custom:Vec<Piece>
     
 }
@@ -81,7 +81,7 @@ impl PieceSet{
             bishop: Piece::new_piece(player,'b'),
             knight: Piece::new_piece(player,'k'),
             pawn: Piece::new_piece(player,'p'),
-            all_pieces: Bitboard::zero(),
+            occupied: Bitboard::zero(),
         }
     }
     pub fn as_array(&self) -> [&Piece; 6] {
@@ -180,7 +180,7 @@ impl Position{
                             sec_digit=0;
                         }
                     } else {
-                        let all_pieces_bb: &mut Bitboard = if c.is_ascii_lowercase(){&mut white_piece_set.all_pieces} else {&mut black_piece_set.all_pieces};
+                        let all_pieces_bb: &mut Bitboard = if c.is_ascii_lowercase(){&mut white_piece_set.occupied} else {&mut black_piece_set.occupied};
                         let bitboard: &mut Bitboard = match c.to_ascii_lowercase(){
                             'p'=> if c.is_ascii_lowercase(){&mut white_piece_set.pawn.bitboard} else {&mut black_piece_set.pawn.bitboard}
                             'k'=> if c.is_ascii_lowercase(){&mut white_piece_set.king.bitboard} else {&mut black_piece_set.king.bitboard}
@@ -215,14 +215,14 @@ impl Position{
             }
         }
         let mut pieces = Vec::new();
-        let position_bitboard = Bitboard::zero() | &white_piece_set.all_pieces | &black_piece_set.all_pieces;
+        let position_bitboard = Bitboard::zero() | &white_piece_set.occupied | &black_piece_set.occupied;
         pieces.push(white_piece_set);
         pieces.push(black_piece_set);
         Position{dimensions:dimensions,turn:turn,pieces:pieces,position_bitboard:position_bitboard }
     }
 
     pub fn get_opponent_position_bb(&self)-> Bitboard{
-        return &self.position_bitboard & !&self.pieces[self.turn as usize].all_pieces;
+        return &self.position_bitboard & !&self.pieces[self.turn as usize].occupied;
     }
 
     pub fn make_move(&mut self,turn:Color,mv:&Move){

@@ -6,6 +6,14 @@ pub fn to_pos(x:u8,y:u8) -> usize{
     ((x*16)+y).into()
 }
 
+pub fn to_col(pos:u8)->u8{
+    pos%16
+}
+
+pub fn to_row(pos:u8)->u8{
+    pos/16
+}
+
 pub fn to_string(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();
     for i in 0..16{
