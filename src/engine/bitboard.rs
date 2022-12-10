@@ -16,6 +16,7 @@ pub fn to_row(pos:u8)->u8{
 
 pub fn to_string(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();
+    
     for i in 0..16{
         for j in 0..16{
             let index = to_pos(i,j);
@@ -27,6 +28,8 @@ pub fn to_string(bitboard:&Bitboard)->String{
         }
         bb_string.push_str("\n");
     }
+    println!("a16-h16");
     println!("{}",bb_string);
+    println!("a1-h1\n");
     bb_string
 }
