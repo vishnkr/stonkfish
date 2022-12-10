@@ -28,8 +28,15 @@ pub fn to_string(bitboard:&Bitboard)->String{
         }
         bb_string.push_str("\n");
     }
-    println!("a16-h16");
-    println!("{}",bb_string);
-    println!("a1-h1\n");
     bb_string
+}
+
+pub fn to_string_with_board_desc(bitboard:&Bitboard,str:&str)->String{
+    let bitboard_str = to_string(bitboard);
+    let mut new_str = str.to_string();
+    new_str.push_str("\n");
+    new_str.push_str(&bitboard_str);
+    println!("{}",new_str);
+    new_str
+
 }

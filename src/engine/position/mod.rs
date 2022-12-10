@@ -3,7 +3,7 @@ use core::fmt;
 use crate::engine::bitboard::{Bitboard,to_pos,to_string};
 use crate::engine::move_generator::moves::*;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone,PartialEq,Eq)]
 pub enum PieceType{
     Pawn,
 	Knight,
