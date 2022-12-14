@@ -1,6 +1,8 @@
 use std::fmt;
 
-#[derive(Debug,PartialEq)]
+use crate::engine::bitboard::{to_row,to_col};
+
+#[derive(PartialEq)]
 pub struct Move(u32);
 
 #[derive(PartialEq)]
@@ -47,5 +49,43 @@ impl Move{
 impl fmt::Binary for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,"{:#032b}",self.0)
+    }
+}
+
+impl fmt::Debug for Move{
+    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
+        let mtype = match self.parse_mtype() {
+            0=> "Quiet",
+            1=> "Capture",
+            2=> "Promote",
+            3=> "KingSideCastle",
+            4=> "QueenSideCastle",
+            5=> "DoublePawnPush",
+            6=> "En Passant",
+            _ => "Invalid value"
+        };
+        let dest_pos = self.parse_to();
+        let src_pos = self.parse_from();
+        write!(f,"Move {} from {} to {}",mtype,src_pos,dest_pos)
+    }
+}
+
+impl fmt::Display for Move{
+    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
+        let mtype = match self.parse_mtype() {
+            0=> "Quiet",
+            1=> "Capture",
+            2=> "Promote",
+            3=> "KingSideCastle",
+            4=> "QueenSideCastle",
+            5=> "DoublePawnPush",
+            6=> "En Passant",
+            _ => "Invalid value"
+        };
+        let dest_pos = self.parse_to();
+        let src_pos = self.parse_from();
+        let src_coords = (to_row(src_pos as u8),to_col(src_pos as u8));
+        let dest_coords = (to_row(dest_pos as u8),to_col(dest_pos as u8));
+        write!(f,"Move {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,src_pos,src_coords.0,src_coords.1,dest_pos,dest_coords.0,dest_coords.1)
     }
 }

@@ -16,8 +16,9 @@ pub fn to_row(pos:u8)->u8{
 
 pub fn to_string(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();
-    
+    bb_string.push_str("  1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 \n");
     for i in 0..16{
+        bb_string.push_str(&(((i+1)%10).to_string()+" "));
         for j in 0..16{
             let index = to_pos(i,j);
             if bitboard.bit(index).unwrap_or(false){

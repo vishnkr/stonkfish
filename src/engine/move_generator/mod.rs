@@ -30,8 +30,26 @@ pub struct MoveGenerator{
 // contains bitboard with all possible moves for a piece which can be iterated to get a list of moves
 pub struct MoveMask{
     pub bitboard: Bitboard,
-    pub src: usize,
+    pub src: u8,
     pub piece_type: PieceType,
+    pub opponent:Bitboard
+}
+
+impl Iterator for MoveMask{
+    type Item = Move;
+
+    fn next(&mut self)->Option<Self::Item>{
+        let dest_pos = match self.bitboard.lowest_one(){
+            Some(x) => x,
+            None=> return None
+        };
+        self.bitboard.set_bit(dest_pos,false);
+;        let mut mtype = MType::Quiet;
+        if self.opponent.bit(dest_pos).unwrap(){
+            mtype = MType::Capture;
+        }
+        Some(Move::new(self.src, dest_pos as u8, mtype))
+    }
 }
 
 #[derive(PartialEq,Eq,Hash,Copy,Clone)]
@@ -169,6 +187,9 @@ impl AttackTable{
 
     pub fn get_rank(&self,pos:u8)->Bitboard{
         let rank = to_row(pos) as usize;
+        if rank<0 || rank>15{
+            return Bitboard::zero()
+        }
         self.ranks[rank].to_owned()
     }
 
@@ -178,6 +199,36 @@ impl AttackTable{
 
     pub fn get_knight_attacks(&self,position:u8)->Bitboard{
         self.knight_attacks[position as usize].to_owned()
+    }
+
+    pub fn get_pawn_attacks(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
+        let row = to_row(position);
+        let next_rank_bb = match color {
+            Color::WHITE => self.get_rank(position-16),
+            Color::BLACK => self.get_rank(position+16)
+        };
+        let single_push :Bitboard = self.get_king_attacks(position) & self.get_file(position) & next_rank_bb;
+        let mut double_push :Bitboard = Bitboard::zero();
+        match color{
+            Color::WHITE => {
+                if row == dimensions.height-2 {
+                    // no double push allowed if single push is blocked by own piece
+                    if !player_bb.bit(single_push.lowest_one().unwrap()).unwrap(){
+                        double_push = &single_push >> 16;
+                    }
+                    
+                }
+            },
+            Color::BLACK => {
+                if row == 1 {
+                    if !player_bb.bit(single_push.lowest_one().unwrap()).unwrap(){
+                        double_push = &single_push << 16;
+                    }
+                }
+            }
+        };
+        ((single_push | double_push) & !opponent) | (&self.pawn_attacks[color as usize][position as usize] & opponent)
+        
     }
 
     pub fn get_bishop_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
@@ -322,9 +373,7 @@ impl AttackTable{
     pub fn map_file_to_first_rank(&self,bb:&Bitboard,pos:u8)->Bitboard{
        let file = to_col(pos);
        let mut mask_a_file = (&self.files[file as usize] & bb)>> file;
-       to_string_with_board_desc(&mask_a_file,"Masked src file to first rank");
        let (mut masked_with_diagonal,valid) = mask_a_file.overflowing_mul(&self.anti_diagonal);
-       to_string_with_board_desc(&masked_with_diagonal,"After multiplying with diagonal");
        &masked_with_diagonal >> (240)
     }
 
@@ -334,10 +383,7 @@ impl AttackTable{
 
     pub fn map_rank_to_first_file(&self, bb: &Bitboard, pos: u8) -> Bitboard {
         let mut bb2 = bb.overflowing_mul(&self.anti_diagonal).0;
-        to_string_with_board_desc(&bb2,"multiplied rank with diagonal");
-        
         let ret = (bb2 >> 15) & &self.files[0];
-        to_string_with_board_desc(&ret, "Mapped rank to first file");
         ret
     }
 
@@ -349,13 +395,11 @@ impl MoveGenerator{
         Self{attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height})}
     }
 
-    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)->(Vec<MoveMask>,Bitboard){
+    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position,color:Color)-> impl Iterator<Item=Move>{
         let mut move_masks :Vec<MoveMask> = Vec::new();
-        let opponent_bb = &cur_position.get_opponent_position_bb();
-        let player_bb = &cur_position.pieces[cur_position.turn as usize].occupied;
-        to_string_with_board_desc(&opponent_bb,"Opponent board");
+        let opponent_bb = &cur_position.get_opponent_position_bb(color);
+        let player_bb = &cur_position.pieces[color as usize].occupied;
         let occupancy = &cur_position.position_bitboard;
-        to_string_with_board_desc(&occupancy,"All occupied pieces");
         let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|{
             while !piece_bitboard.is_zero(){
                 let mut pos = piece_bitboard.lowest_one().unwrap_or(0) as u8;
@@ -365,7 +409,8 @@ impl MoveGenerator{
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
-                    _ => self.attack_table.get_king_attacks(pos),
+                    PieceType::Pawn => self.attack_table.get_pawn_attacks(pos,cur_position.turn,&cur_position.dimensions,player_bb,opponent_bb),
+                    _ => self.attack_table.get_knight_attacks(pos),
                 };
                 
                 attack_bb &= !player_bb;
@@ -373,20 +418,12 @@ impl MoveGenerator{
                 piece_bitboard.set_bit(pos.into(),false);
                 attack_bb.set_bit(pos.into(),false);
                 attack_bb &= &self.attack_table.full_bitboard;
-                match piece_type{
-                    PieceType::Rook=> {
-                    to_string_with_board_desc(&attack_bb,"Final Rook Attack Board");
-                    },
-                    PieceType::Bishop=>{
-                        to_string_with_board_desc(&attack_bb,"Final Bishop Attack Board");
-                    },
-                    _ => println!("in progress")
-                }
                 move_masks.push(
                     MoveMask{
                     bitboard:attack_bb,
                     src:pos.into(),
                     piece_type,
+                    opponent: opponent_bb.to_owned()
                 });
             }
             
@@ -397,7 +434,7 @@ impl MoveGenerator{
             gen_piece_moves_bb(piece.piece_type,(&piece.bitboard).to_owned());
         }
         
-        (move_masks,opponent_bb.clone())
+        move_masks.into_iter().flatten()
         
     }
 
@@ -427,10 +464,12 @@ mod movegen_tests{
     }
     #[test]
     pub fn print_helper_test(){
-        let mvgen = MoveGenerator::new(Dimensions{width:8,height:8});
-        let mut position = Position::load_from_fen("1n6/3b2p1/1r1p4/4b3/N2R2R1/8/7n/3n4 w - - 0 1".to_string());
-        mvgen.generate_pseudolegal_moves(&mut position);
-        
+        let dimensions = Dimensions{width:8,height:8};
+        let mvgen = MoveGenerator::new(dimensions);
+        let mut position = Position::load_from_fen("8/8/8/8/1n3b2/P1P1P3/1PP3P1/8 w - - 0 1".to_string());
+        for mv in mvgen.generate_pseudolegal_moves(&mut position,Color::WHITE){
+            println!("{}",mv);
+        }
     }
 
 }
