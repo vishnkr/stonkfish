@@ -14,7 +14,7 @@ pub fn to_row(pos:u8)->u8{
     pos/16
 }
 
-pub fn to_string(bitboard:&Bitboard)->String{
+pub fn display_bitboard(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();
     bb_string.push_str("  1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 \n");
     for i in 0..16{
@@ -32,8 +32,8 @@ pub fn to_string(bitboard:&Bitboard)->String{
     bb_string
 }
 
-pub fn to_string_with_board_desc(bitboard:&Bitboard,str:&str)->String{
-    let bitboard_str = to_string(bitboard);
+pub fn display_bitboard_with_board_desc(bitboard:&Bitboard,str:&str)->String{
+    let bitboard_str = display_bitboard(bitboard);
     let mut new_str = str.to_string();
     new_str.push_str("\n");
     new_str.push_str(&bitboard_str);

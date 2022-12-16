@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::engine::bitboard::{Bitboard,to_pos,to_string};
+use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard};
 use crate::engine::move_generator::moves::*;
 
 #[derive(Copy, Clone,PartialEq,Eq)]
@@ -193,8 +193,6 @@ impl Position{
                         let pos = to_pos(row,col);
                         bitboard.set_bit(pos,true);
                         all_pieces_bb.set_bit(pos,true);
-                        //println!("piece- {}",c);
-                        //to_string(&bitboard);
                         col+=1
                     }
                 }
@@ -225,20 +223,87 @@ impl Position{
         return &self.position_bitboard & !&self.pieces[color as usize].occupied;
     }
 
-    pub fn make_move(&mut self,turn:Color,mv:&Move){
-        let src:usize = mv.parse_from();
-        let dest:usize = mv.parse_to();
-        let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();
+    pub fn make_move(&mut self,color:Color,mv:&Move){
+        let src:usize = mv.parse_from() as usize;
+        let dest:usize = mv.parse_to() as usize;
+        let mtype = mv.parse_mtype().unwrap();
+        //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
+        match mtype{
+            MType::Quiet =>{
+                self.move_piece(color, (src,dest));
+            },
+            MType::KingsideCastle => {},
+            MType::QueensideCastle => {},
+            MType::Capture =>{
+                let mut opponent_color = Color::WHITE;
+                if color == Color::WHITE{ opponent_color = Color::BLACK }
+                let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
+                self.remove_piece(opponent_color,dest);
+                self.move_piece(color,(src,dest));
+            },
+            MType::Promote =>{},
+            MType::EnPassant =>{}
+        }
+        self.update_occupied_bitboard();
+        
+    }
+
+    pub fn remove_piece(&mut self,color:Color,sq:usize){
+        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(sq).unwrap();
+        self.position_bitboard.set_bit(sq,false);
+        piece.bitboard.set_bit(sq,false);
+    }
+    
+    pub fn undo_remove_piece(&mut self,color:Color,sq:usize){
+        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(sq).unwrap();
+        self.position_bitboard.set_bit(sq,true);
+        piece.bitboard.set_bit(sq,true);
+    }
+
+    pub fn update_occupied_bitboard(&mut self){
+        const colors: [Color;2] = [Color::WHITE,Color::BLACK];
+        for color in colors{
+            let mut new_val = Bitboard::zero();
+            for piece in self.pieces[color as usize].as_array(){
+                new_val |= &piece.bitboard;
+            }
+            self.pieces[color as usize].occupied = new_val;
+        }
+    }
+
+    pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
+        let src = from_to.0;
+        let dest = from_to.1;
+        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
+        self.position_bitboard.set_bit(src,false);
+        self.position_bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(src,false);
     }
 
-    pub fn unmake_move(&mut self,turn:Color,mv:&Move){
-        let src:usize = mv.parse_from();
-        let dest:usize = mv.parse_to();
-        let piece:&mut Piece = self.pieces[turn as usize].get_piece_from_sq(src).unwrap();
-        piece.bitboard.set_bit(src,true);
-        piece.bitboard.set_bit(dest,false);
+    pub fn unmake_move(&mut self,color:Color,mv:&Move){
+        let src:usize = mv.parse_from() as usize;
+        let dest:usize = mv.parse_to() as usize;
+        let mtype = mv.parse_mtype().unwrap();
+        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
+
+        match mtype{
+            MType::Quiet =>{
+                self.move_piece(color, (dest,src));
+            },
+            MType::KingsideCastle => {},
+            MType::QueensideCastle => {},
+            MType::Capture =>{
+                let mut opponent_color = Color::WHITE;
+                if color == Color::WHITE{ opponent_color = Color::BLACK }
+                let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
+                self.undo_remove_piece(opponent_color,dest);
+                self.move_piece(color,(dest,src));
+            },
+            MType::Promote =>{},
+            MType::EnPassant =>{}
+        }
+        self.update_occupied_bitboard()
     }
 }
 

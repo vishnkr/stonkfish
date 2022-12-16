@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 use std::collections::HashMap;
 //use self::move_mask::MoveMask;
 pub mod moves;
-pub mod move_mask;
+
 //Attack - Defend Map or Attack table, precalculated for standard pieces
 pub struct AttackTable{
     knight_attacks: ArrayVec::<Bitboard,256>,
@@ -27,30 +27,7 @@ pub struct MoveGenerator{
     attack_table: AttackTable,
 }
 
-// contains bitboard with all possible moves for a piece which can be iterated to get a list of moves
-pub struct MoveMask{
-    pub bitboard: Bitboard,
-    pub src: u8,
-    pub piece_type: PieceType,
-    pub opponent:Bitboard
-}
 
-impl Iterator for MoveMask{
-    type Item = Move;
-
-    fn next(&mut self)->Option<Self::Item>{
-        let dest_pos = match self.bitboard.lowest_one(){
-            Some(x) => x,
-            None=> return None
-        };
-        self.bitboard.set_bit(dest_pos,false);
-;        let mut mtype = MType::Quiet;
-        if self.opponent.bit(dest_pos).unwrap(){
-            mtype = MType::Capture;
-        }
-        Some(Move::new(self.src, dest_pos as u8, mtype))
-    }
-}
 
 #[derive(PartialEq,Eq,Hash,Copy,Clone)]
 pub enum SlideDirection{
@@ -438,13 +415,29 @@ impl MoveGenerator{
         
     }
 
+    fn generate_legal_moves<'a>(&'a self,cur_position:&'a mut Position,color:Color)-> Vec<(u8,u8)>{
+       let mut pseudo_moves = self.generate_pseudolegal_moves(cur_position, color);
+       let mut legal_moves:Vec<(u8,u8)> = Vec::new();
+       for mv in pseudo_moves.filter(|mv| self.is_legal_move(cur_position, &mv)){
+        legal_moves.push((mv.parse_from() as u8,mv.parse_to() as u8));
+       }
+       legal_moves
+    }
+
+    pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
+        position.make_move(position.turn, mv);
+
+        position.unmake_move(position.turn, mv);
+        true
+    }
+
     
 }
 
 #[cfg(test)]
 mod movegen_tests{
     use super::*;
-    use crate::engine::bitboard::{to_string};
+    use crate::engine::bitboard::{display_bitboard};
     #[test]
     pub fn test_rank_attack_occupancy_lookup(){
         let occupancy_lookup:Vec<Vec<u16>> = AttackTable::gen_occupancy_lookup();
@@ -459,8 +452,8 @@ mod movegen_tests{
         let pos = 67;
         let row = to_row(pos) as i8;
         let col = to_col(pos) as i8;
-        to_string_with_board_desc(&(at.diagonals.get(&(col-row)).unwrap()), "Diagonal from pos");
-        to_string_with_board_desc(&(at.anti_diagonals.get(&(col+row)).unwrap()), "aNTI Diagonal from pos");
+        display_bitboard_with_board_desc(&(at.diagonals.get(&(col-row)).unwrap()), "Diagonal from pos");
+        display_bitboard_with_board_desc(&(at.anti_diagonals.get(&(col+row)).unwrap()), "aNTI Diagonal from pos");
     }
     #[test]
     pub fn print_helper_test(){
