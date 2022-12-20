@@ -3,6 +3,8 @@ use core::fmt;
 use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard};
 use crate::engine::move_generator::moves::*;
 
+use super::bitboard::display_bitboard_with_board_desc;
+
 #[derive(Copy, Clone,PartialEq,Eq)]
 pub enum PieceType{
     Pawn,
@@ -12,6 +14,11 @@ pub enum PieceType{
 	Queen,
 	King,
     Custom,
+}
+impl PieceType{
+    pub fn to_string(&self)->String{
+        format!("{:?}",self)
+    }
 }
 
 impl fmt::Debug for PieceType{
@@ -34,7 +41,7 @@ pub enum Color{
     BLACK
 }
 
-
+#[derive(Debug,PartialEq)]
 pub struct Piece{
     pub piece_type:PieceType,
     pub bitboard: Bitboard,
@@ -58,6 +65,7 @@ impl Piece{
 }
 
 
+#[derive(Debug,PartialEq)]
 pub struct PieceSet{
     pub player:u8,
     pub king:Piece,
@@ -104,15 +112,44 @@ impl PieceSet{
             None
         }
     }
+
+    pub fn get_piece_from_piecetype(&mut self,piece_type:PieceType)->Option<&mut Piece>{
+        match piece_type{
+            PieceType::Bishop=> Some(&mut self.bishop),
+            PieceType::Knight=> Some(&mut self.knight),
+            PieceType::King=> Some(&mut self.king),
+            PieceType::Queen=> Some(&mut self.queen),
+            PieceType::Pawn=> Some(&mut self.pawn),
+            PieceType::Custom=> None,
+            PieceType::Rook=> Some(&mut self.rook),
+        }
+    }
 }
 
+#[derive(Debug)]
 pub struct Position{
     pub turn: Color,
     pub dimensions:Dimensions,
     //ind-0: white set, ind-1: black set
     pub pieces: Vec<PieceSet>,
+    // castling right is encoded as follows - white kingside (2 bits) | white queenside (2 bits) | black kingside (2 bits) | black queenside (2 bits)
+    pub castling_rights: u8,
+    pub has_king_moved: bool,
+    pub recent_capture: Option<(PieceType,char)>,
     pub position_bitboard: Bitboard
 }
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.turn == other.turn &&
+        self.dimensions == other.dimensions &&
+        self.pieces == other.pieces &&
+        self.castling_rights == other.castling_rights &&
+        self.has_king_moved == other.has_king_moved &&
+        self.position_bitboard == other.position_bitboard
+    }
+}
+
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct Dimensions{
@@ -156,10 +193,7 @@ impl Position{
         let mut col = 0;
         let mut row = 0;
         let mut count;
-        let mut _castle_white_kingside = false;
-        let mut _castle_white_queenside = false;
-        let mut _castle_black_kingside = false;
-        let mut _castle_black_queenside = false;
+        let mut castling_rights:u8 = 0;
         for (i,c) in fen.chars().enumerate(){
             if c==' '{
                 fen_part+=1;
@@ -201,12 +235,12 @@ impl Position{
                     else{turn=Color::BLACK;}
                 }
                 2=>{
-                    match c {
-                        'K'=> _castle_white_kingside=true,
-                        'Q'=>_castle_white_queenside=true,
-                        'k'=>_castle_black_kingside=true,
-                        'q'=>_castle_black_queenside=true,
-                        _ => {}
+                    castling_rights |= match c {
+                        'K'=>  1<<6,
+                        'Q'=> 1<<4,
+                        'k'=> 1<<2,
+                        'q'=> 1,
+                        _ => 0
                     }
                 }
                 _ => continue,
@@ -216,7 +250,15 @@ impl Position{
         let position_bitboard = Bitboard::zero() | &white_piece_set.occupied | &black_piece_set.occupied;
         pieces.push(white_piece_set);
         pieces.push(black_piece_set);
-        Position{dimensions:dimensions,turn:turn,pieces:pieces,position_bitboard:position_bitboard }
+        Position{
+            dimensions,
+            turn,
+            pieces,
+            castling_rights,
+            recent_capture: None,
+            has_king_moved: false,
+            position_bitboard 
+        }
     }
 
     pub fn get_opponent_position_bb(&self,color:Color)-> Bitboard{
@@ -238,6 +280,7 @@ impl Position{
                 let mut opponent_color = Color::WHITE;
                 if color == Color::WHITE{ opponent_color = Color::BLACK }
                 let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
+                self.recent_capture = Some((captured_piece.piece_type,captured_piece.piece_repr));
                 self.remove_piece(opponent_color,dest);
                 self.move_piece(color,(src,dest));
             },
@@ -254,8 +297,8 @@ impl Position{
         piece.bitboard.set_bit(sq,false);
     }
     
-    pub fn undo_remove_piece(&mut self,color:Color,sq:usize){
-        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(sq).unwrap();
+    pub fn undo_remove_piece(&mut self,color:Color,sq:usize, piece_type:PieceType){
+        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_piecetype(piece_type).unwrap();
         self.position_bitboard.set_bit(sq,true);
         piece.bitboard.set_bit(sq,true);
     }
@@ -284,9 +327,9 @@ impl Position{
     pub fn unmake_move(&mut self,color:Color,mv:&Move){
         let src:usize = mv.parse_from() as usize;
         let dest:usize = mv.parse_to() as usize;
-        let mtype = mv.parse_mtype().unwrap();
-        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
-
+        let mtype = mv.parse_mtype().unwrap_or(MType::Quiet);
+        //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(dest).unwrap();
+        
         match mtype{
             MType::Quiet =>{
                 self.move_piece(color, (dest,src));
@@ -294,16 +337,25 @@ impl Position{
             MType::KingsideCastle => {},
             MType::QueensideCastle => {},
             MType::Capture =>{
-                let mut opponent_color = Color::WHITE;
-                if color == Color::WHITE{ opponent_color = Color::BLACK }
-                let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
-                self.undo_remove_piece(opponent_color,dest);
-                self.move_piece(color,(dest,src));
+                let opponent_color:Color = self.get_opponent_color(color);
+                let captured_piece = self.recent_capture;
+                self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
+                let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(dest).unwrap();
+                self.position_bitboard.set_bit(src,true);
+                piece.bitboard.set_bit(src,true);
+                piece.bitboard.set_bit(dest,false);
             },
             MType::Promote =>{},
             MType::EnPassant =>{}
         }
         self.update_occupied_bitboard()
+    }
+
+    pub fn get_opponent_color(&self,color:Color)->Color{
+        if color == Color::WHITE{
+            return Color::BLACK
+        }
+        Color::WHITE
     }
 }
 

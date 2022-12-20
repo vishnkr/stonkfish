@@ -178,7 +178,11 @@ impl AttackTable{
         self.knight_attacks[position as usize].to_owned()
     }
 
-    pub fn get_pawn_attacks(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
+    pub fn get_pawn_attacks(&self,position:u8,color:Color,opponent:&Bitboard)->Bitboard{
+        &self.pawn_attacks[color as usize][position as usize] & opponent
+    }
+
+    pub fn get_pawn_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
         let row = to_row(position);
         let next_rank_bb = match color {
             Color::WHITE => self.get_rank(position-16),
@@ -204,8 +208,11 @@ impl AttackTable{
                 }
             }
         };
-        ((single_push | double_push) & !opponent) | (&self.pawn_attacks[color as usize][position as usize] & opponent)
-        
+        ((single_push | double_push) & !opponent)
+    }
+
+    pub fn get_pawn_attacks_and_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
+        self.get_pawn_pushes(position, color, dimensions, player_bb, opponent) | self.get_pawn_attacks(position, color, opponent)
     }
 
     pub fn get_bishop_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
@@ -386,7 +393,7 @@ impl MoveGenerator{
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
-                    PieceType::Pawn => self.attack_table.get_pawn_attacks(pos,cur_position.turn,&cur_position.dimensions,player_bb,opponent_bb),
+                    PieceType::Pawn => self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,opponent_bb),
                     _ => self.attack_table.get_knight_attacks(pos),
                 };
                 
@@ -426,10 +433,45 @@ impl MoveGenerator{
 
     pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
         position.make_move(position.turn, mv);
-
+        let mut is_under_check = false;
+        let opponent_color = position.get_opponent_color(position.turn);
+        let opponent_bb = position.get_opponent_position_bb(position.turn);
+        if self.is_king_under_check(position,position.turn,(opponent_color,&opponent_bb)){
+            is_under_check = true
+        }
         position.unmake_move(position.turn, mv);
-        true
+        !is_under_check
     }
+
+    pub fn is_king_under_check(&self,position:&mut Position,color:Color,opponent_info:(Color,&Bitboard))-> bool{
+        let pieces = &mut position.pieces;
+        let mut opponent_clone = opponent_info.1.clone();
+        let occupancy = &position.position_bitboard;
+
+        while !opponent_clone.is_zero(){
+                let mut pos = opponent_clone.lowest_one().unwrap_or(0) as u8;
+                let piece = pieces[opponent_info.0 as usize].get_piece_from_sq(pos.into()).unwrap();
+                let mut attack_bb = match piece.piece_type{
+                    PieceType::King => self.attack_table.get_king_attacks(pos),
+                    PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
+                    PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
+                    PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
+                    PieceType::Knight => self.attack_table.get_knight_attacks(pos),
+                    PieceType::Pawn => {
+                        let player_bb = &pieces[color as usize].occupied;
+                        self.attack_table.get_pawn_attacks(pos,opponent_info.0,&opponent_clone)
+                    },
+                    _ => self.attack_table.get_knight_attacks(pos),
+                };
+                if !(attack_bb & &pieces[color as usize].king.bitboard).is_zero(){
+                    return true
+                }
+                opponent_clone.set_bit(pos.into(),false);
+        }
+
+        false
+    }
+
 
     
 }
@@ -459,9 +501,41 @@ mod movegen_tests{
     pub fn print_helper_test(){
         let dimensions = Dimensions{width:8,height:8};
         let mvgen = MoveGenerator::new(dimensions);
-        let mut position = Position::load_from_fen("8/8/8/8/1n3b2/P1P1P3/1PP3P1/8 w - - 0 1".to_string());
-        for mv in mvgen.generate_pseudolegal_moves(&mut position,Color::WHITE){
+        let mut position = Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let val = mvgen.generate_pseudolegal_moves(&mut position,Color::WHITE);
+        for mv in val{
             println!("{}",mv);
+        }
+    }
+
+    #[test]
+    pub fn test_legal_movegen(){
+        let dimensions = Dimensions{width:8,height:8};
+        let mvgen = MoveGenerator::new(dimensions);
+        let mut position = Position::load_from_fen("3r4/8/8/8/8/8/3R4/3K4 w - - 0 1".to_string());
+        for mv in mvgen.generate_legal_moves(&mut position,Color::WHITE){
+            println!("src {} {}, dest {} {}",to_row(mv.0),to_col(mv.0),to_row(mv.1),to_col(mv.1));
+        }
+        
+    }
+
+    #[test]
+    pub fn test_unmake_move(){
+        let dimensions = Dimensions{width:8,height:8};
+        let mvgen = MoveGenerator::new(dimensions);
+        let position = &mut Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let original = &Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        for mv in mvgen.generate_pseudolegal_moves(position, Color::WHITE){
+            position.make_move(Color::WHITE, &mv);
+            position.unmake_move(Color::WHITE, &mv);
+            assert_eq!(original.position_bitboard,position.position_bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].occupied,position.pieces[Color::WHITE as usize].occupied);
+            assert_eq!(original.pieces[Color::WHITE as usize].pawn.bitboard,position.pieces[Color::WHITE as usize].pawn.bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].king.bitboard,position.pieces[Color::WHITE as usize].king.bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].knight.bitboard,position.pieces[Color::WHITE as usize].knight.bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].queen.bitboard,position.pieces[Color::WHITE as usize].queen.bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].rook.bitboard,position.pieces[Color::WHITE as usize].rook.bitboard);
+            assert_eq!(original.pieces[Color::WHITE as usize].bishop.bitboard,position.pieces[Color::WHITE as usize].bishop.bitboard);
         }
     }
 

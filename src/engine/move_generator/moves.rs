@@ -19,13 +19,27 @@ pub enum MType{
 
 impl fmt::Display for MType{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
-        fmt::Debug::fmt(self,f)
+        match self{
+            MType::Quiet => write!(f, "Quiet"),
+            MType::Capture => write!(f, "Capture"),
+            MType::Promote => write!(f, "Promote"),
+            MType::KingsideCastle => write!(f, "KS Castle"),
+            MType::QueensideCastle => write!(f, "QS Castle"),
+            MType::EnPassant => write!(f, "En Passant")
+        }
     }
 }
 
 impl fmt::Debug for MType{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
-        write!(f, "{:?}",self)
+        match self{
+            MType::Quiet => write!(f, "Quiet"),
+            MType::Capture => write!(f, "Capture"),
+            MType::Promote => write!(f, "Promote"),
+            MType::KingsideCastle => write!(f, "KS Castle"),
+            MType::QueensideCastle => write!(f, "QS Castle"),
+            MType::EnPassant => write!(f, "En Passant")
+        }
     }
 }
 
@@ -55,6 +69,7 @@ impl Move{
     }
     pub fn parse_mtype(&self)->Option<MType>{
         let mtype = (self.0 & 0xFF) as u32;
+        //println!("mtype {}",mtype);
         match mtype {
             0 => Some(MType::Quiet),
             1u32 => Some(MType::Capture),
