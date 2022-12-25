@@ -1,8 +1,10 @@
+mod piece_sq;
+
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
 use arrayvec::ArrayVec;
 pub use crate::engine::position::{Position,PieceSet,PieceType};
-pub use crate::engine::move_generator::{SlideDirection};
+pub use crate::engine::move_generation::{SlideDirection};
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
@@ -31,7 +33,7 @@ impl Evaluator{
         material_score
     }
 
-    pub fn perform_evaluation(&mut self,position:&mut Position)->isize{
+    pub fn get_material_eval_score(&mut self,position:&mut Position)->isize{
         let mut total_score = 0;
         for piece_set in position.pieces.iter(){
             println!("ts {}",self.calc_material_score(piece_set));
