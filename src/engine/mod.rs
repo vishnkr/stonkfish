@@ -1,13 +1,13 @@
 
 pub mod bitboard;
-pub mod evaluator;
-pub mod move_generator;
+pub mod evaluation;
+pub mod move_generation;
 pub mod position;
 use position::{Position};
 
 pub struct Engine{
-    move_generator: move_generator::MoveGenerator,
-    evaluator: evaluator::Evaluator,
+    move_generator: move_generation::MoveGenerator,
+    evaluator: evaluation::Evaluator,
     position: Position
 }
 
@@ -15,8 +15,8 @@ impl Engine{
     pub fn new(fen:String)->Engine{
         let position : Position = Position::new(fen);
         Engine{
-            move_generator: move_generator::MoveGenerator::new(position.dimensions.clone()),
-            evaluator: evaluator::Evaluator::new(),
+            move_generator: move_generation::MoveGenerator::new(position.dimensions.clone()),
+            evaluator: evaluation::Evaluator::new(),
             position: position,
         }
     }

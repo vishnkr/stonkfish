@@ -1,11 +1,15 @@
 use core::fmt;
 
 use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard};
-use crate::engine::move_generator::moves::*;
+use crate::engine::move_generation::moves::*;
+
+use self::zobrist::Zobrist;
 
 use super::bitboard::display_bitboard_with_board_desc;
 
-#[derive(Copy, Clone,PartialEq,Eq)]
+pub mod zobrist;
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PieceType{
     Pawn,
 	Knight,
@@ -18,6 +22,9 @@ pub enum PieceType{
 impl PieceType{
     pub fn to_string(&self)->String{
         format!("{:?}",self)
+    }
+    pub fn as_vec()-> Vec<PieceType>{
+        vec!(PieceType::Pawn,PieceType::Knight,PieceType::Bishop,PieceType::Rook,PieceType::Queen,PieceType::King)
     }
 }
 
@@ -136,7 +143,8 @@ pub struct Position{
     pub castling_rights: u8,
     pub has_king_moved: bool,
     pub recent_capture: Option<(PieceType,char)>,
-    pub position_bitboard: Bitboard
+    pub position_bitboard: Bitboard,
+    pub zobrist_hash: Zobrist,
 }
 
 impl PartialEq for Position {
@@ -257,7 +265,8 @@ impl Position{
             castling_rights,
             recent_capture: None,
             has_king_moved: false,
-            position_bitboard 
+            position_bitboard,
+            zobrist_hash : Zobrist::new()
         }
     }
 
@@ -357,6 +366,24 @@ impl Position{
         }
         Color::WHITE
     }
+
+    pub fn get_zobrist_hash(&self)-> u64{
+        let mut zobrist_hash_key = 0u64;
+        for (i,piece_set) in self.pieces.iter().enumerate(){
+            for piece in piece_set.as_array(){
+                let mut bitboard = piece.bitboard.to_owned();
+                while !bitboard.is_zero(){
+                    let pos = bitboard.lowest_one().unwrap_or(0);
+                    zobrist_hash_key ^= self.zobrist_hash.piece_keys[i][&piece.piece_type][pos];
+                    bitboard.set_bit(pos,false);
+                }
+            }
+        }
+        if self.turn == Color::BLACK{
+            zobrist_hash_key ^= self.zobrist_hash.black_to_move;
+        }
+        zobrist_hash_key
+    }
 }
 
 
@@ -372,4 +399,19 @@ mod position_tests{
         assert_eq!(result.dimensions,dimensions);
         assert_eq!(result.turn,turn);
     }
+
+    #[test]
+    fn test_eq_zobrist_hash(){
+        let pos1 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        let pos2 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        assert_eq!(pos1.get_zobrist_hash(),pos2.get_zobrist_hash())
+    }
+
+    #[test]
+    fn test_unequal_zobrist_hash(){
+        let pos1 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        let pos2 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string());
+        assert_ne!(pos1.get_zobrist_hash(),pos2.get_zobrist_hash())
+    }
 }
+
