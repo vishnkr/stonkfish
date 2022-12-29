@@ -2,12 +2,14 @@ use crate::engine::position::*;
 use std::{collections::HashMap};
 use rand::{SeedableRng, Rng, rngs::StdRng};
 
+pub type ZobristKey = u64;
+
 #[derive(Debug)]
 pub struct Zobrist{
-    pub piece_keys: Vec<HashMap<PieceType,Vec<u64>>>,
-    pub en_passant_keys:Vec<u64>,
-    pub random_side: u64,
-    pub black_to_move:u64,
+    pub piece_keys: Vec<HashMap<PieceType,Vec<ZobristKey>>>,
+    pub en_passant_keys:Vec<ZobristKey>,
+    pub random_side: ZobristKey,
+    pub black_to_move:ZobristKey,
 }
 
 impl Zobrist{

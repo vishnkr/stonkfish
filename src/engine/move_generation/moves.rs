@@ -2,7 +2,7 @@
 use std::{fmt::{self, write}};
 use crate::engine::{bitboard::*, position::PieceType};
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Copy,Clone)]
 pub struct Move(u32);
 
 #[derive(PartialEq)]
@@ -14,7 +14,8 @@ pub enum MType{
     KingsideCastle,
     // refers to castling on the left
     QueensideCastle,
-    EnPassant
+    EnPassant,
+    None
 }
 
 impl fmt::Display for MType{
@@ -25,7 +26,8 @@ impl fmt::Display for MType{
             MType::Promote => write!(f, "Promote"),
             MType::KingsideCastle => write!(f, "KS Castle"),
             MType::QueensideCastle => write!(f, "QS Castle"),
-            MType::EnPassant => write!(f, "En Passant")
+            MType::EnPassant => write!(f, "En Passant"),
+            MType::None => write!(f, "Invalid move"),
         }
     }
 }
@@ -38,7 +40,8 @@ impl fmt::Debug for MType{
             MType::Promote => write!(f, "Promote"),
             MType::KingsideCastle => write!(f, "KS Castle"),
             MType::QueensideCastle => write!(f, "QS Castle"),
-            MType::EnPassant => write!(f, "En Passant")
+            MType::EnPassant => write!(f, "En Passant"),
+            MType::None => write!(f, "Invalid move"),
         }
     }
 }
@@ -55,7 +58,8 @@ impl Move{
                 MType::Promote => 2u32,
                 MType::KingsideCastle => 3u32,
                 MType::QueensideCastle => 4u32,
-                MType::EnPassant => 5u32
+                MType::EnPassant => 5u32,
+                MType::None => 6u32
             }).into()
     }
     pub fn make_move(&self){
@@ -77,7 +81,7 @@ impl Move{
             3u32 => Some(MType::KingsideCastle),
             4u32 => Some(MType::QueensideCastle),
             5u32 => Some(MType::EnPassant),
-            _ => None
+            _ => Some(MType::None)
         }
     }
 }

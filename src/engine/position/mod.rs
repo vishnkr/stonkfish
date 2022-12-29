@@ -274,27 +274,28 @@ impl Position{
         return &self.position_bitboard & !&self.pieces[color as usize].occupied;
     }
 
-    pub fn make_move(&mut self,color:Color,mv:&Move){
+    pub fn make_move(&mut self,mv:&Move){
         let src:usize = mv.parse_from() as usize;
         let dest:usize = mv.parse_to() as usize;
         let mtype = mv.parse_mtype().unwrap();
         //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
         match mtype{
             MType::Quiet =>{
-                self.move_piece(color, (src,dest));
+                self.move_piece(self.turn, (src,dest));
             },
             MType::KingsideCastle => {},
             MType::QueensideCastle => {},
             MType::Capture =>{
                 let mut opponent_color = Color::WHITE;
-                if color == Color::WHITE{ opponent_color = Color::BLACK }
+                if self.turn == Color::WHITE{ opponent_color = Color::BLACK }
                 let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
                 self.recent_capture = Some((captured_piece.piece_type,captured_piece.piece_repr));
                 self.remove_piece(opponent_color,dest);
-                self.move_piece(color,(src,dest));
+                self.move_piece(self.turn,(src,dest));
             },
             MType::Promote =>{},
-            MType::EnPassant =>{}
+            MType::EnPassant =>{},
+            MType::None => {},
         }
         self.update_occupied_bitboard();
         
@@ -313,7 +314,7 @@ impl Position{
     }
 
     pub fn update_occupied_bitboard(&mut self){
-        const colors: [Color;2] = [Color::WHITE,Color::BLACK];
+        let colors: [Color;2] = [Color::WHITE,Color::BLACK];
         for color in colors{
             let mut new_val = Bitboard::zero();
             for piece in self.pieces[color as usize].as_array(){
@@ -333,7 +334,7 @@ impl Position{
         piece.bitboard.set_bit(src,false);
     }
 
-    pub fn unmake_move(&mut self,color:Color,mv:&Move){
+    pub fn unmake_move(&mut self,mv:&Move){
         let src:usize = mv.parse_from() as usize;
         let dest:usize = mv.parse_to() as usize;
         let mtype = mv.parse_mtype().unwrap_or(MType::Quiet);
@@ -341,21 +342,22 @@ impl Position{
         
         match mtype{
             MType::Quiet =>{
-                self.move_piece(color, (dest,src));
+                self.move_piece(self.turn,(dest,src));
             },
             MType::KingsideCastle => {},
             MType::QueensideCastle => {},
             MType::Capture =>{
-                let opponent_color:Color = self.get_opponent_color(color);
+                let opponent_color:Color = self.get_opponent_color(self.turn);
                 let captured_piece = self.recent_capture;
                 self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
-                let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(dest).unwrap();
+                let piece:&mut Piece = self.pieces[self.turn as usize].get_piece_from_sq(dest).unwrap();
                 self.position_bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(dest,false);
             },
             MType::Promote =>{},
-            MType::EnPassant =>{}
+            MType::EnPassant =>{},
+            MType::None=>{}
         }
         self.update_occupied_bitboard()
     }

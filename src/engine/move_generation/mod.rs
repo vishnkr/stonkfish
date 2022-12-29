@@ -379,8 +379,9 @@ impl MoveGenerator{
         Self{attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height})}
     }
 
-    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position,color:Color)-> impl Iterator<Item=Move>{
+    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
         let mut move_masks :Vec<MoveMask> = Vec::new();
+        let color = cur_position.turn;
         let opponent_bb = &cur_position.get_opponent_position_bb(color);
         let player_bb = &cur_position.pieces[color as usize].occupied;
         let occupancy = &cur_position.position_bitboard;
@@ -422,8 +423,8 @@ impl MoveGenerator{
         
     }
 
-    fn generate_legal_moves<'a>(&'a self,cur_position:&'a mut Position,color:Color)-> Vec<(u8,u8)>{
-       let mut pseudo_moves = self.generate_pseudolegal_moves(cur_position, color);
+    fn generate_legal_moves<'a>(&'a self,cur_position:&'a mut Position)-> Vec<(u8,u8)>{
+       let mut pseudo_moves = self.generate_pseudolegal_moves(cur_position);
        let mut legal_moves:Vec<(u8,u8)> = Vec::new();
        for mv in pseudo_moves.filter(|mv| self.is_legal_move(cur_position, &mv)){
         legal_moves.push((mv.parse_from() as u8,mv.parse_to() as u8));
@@ -432,14 +433,14 @@ impl MoveGenerator{
     }
 
     pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
-        position.make_move(position.turn, mv);
+        position.make_move(mv);
         let mut is_under_check = false;
         let opponent_color = position.get_opponent_color(position.turn);
         let opponent_bb = position.get_opponent_position_bb(position.turn);
         if self.is_king_under_check(position,position.turn,(opponent_color,&opponent_bb)){
             is_under_check = true
         }
-        position.unmake_move(position.turn, mv);
+        position.unmake_move(mv);
         !is_under_check
     }
 
@@ -502,7 +503,7 @@ mod movegen_tests{
         let dimensions = Dimensions{width:8,height:8};
         let mvgen = MoveGenerator::new(dimensions);
         let mut position = Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
-        let val = mvgen.generate_pseudolegal_moves(&mut position,Color::WHITE);
+        let val = mvgen.generate_pseudolegal_moves(&mut position);
         for mv in val{
             println!("{}",mv);
         }
@@ -513,7 +514,7 @@ mod movegen_tests{
         let dimensions = Dimensions{width:8,height:8};
         let mvgen = MoveGenerator::new(dimensions);
         let mut position = Position::load_from_fen("3r4/8/8/8/8/8/3R4/3K4 w - - 0 1".to_string());
-        for mv in mvgen.generate_legal_moves(&mut position,Color::WHITE){
+        for mv in mvgen.generate_legal_moves(&mut position){
             println!("src {} {}, dest {} {}",to_row(mv.0),to_col(mv.0),to_row(mv.1),to_col(mv.1));
         }
         
@@ -525,9 +526,9 @@ mod movegen_tests{
         let mvgen = MoveGenerator::new(dimensions);
         let position = &mut Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
         let original = &Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
-        for mv in mvgen.generate_pseudolegal_moves(position, Color::WHITE){
-            position.make_move(Color::WHITE, &mv);
-            position.unmake_move(Color::WHITE, &mv);
+        for mv in mvgen.generate_pseudolegal_moves(position){
+            position.make_move(&mv);
+            position.unmake_move( &mv);
             assert_eq!(original.position_bitboard,position.position_bitboard);
             assert_eq!(original.pieces[Color::WHITE as usize].occupied,position.pieces[Color::WHITE as usize].occupied);
             assert_eq!(original.pieces[Color::WHITE as usize].pawn.bitboard,position.pieces[Color::WHITE as usize].pawn.bitboard);
