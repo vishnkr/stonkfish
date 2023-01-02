@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard};
+use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard, to_row, to_col};
 use crate::engine::move_generation::moves::*;
 
 use self::zobrist::Zobrist;
@@ -278,6 +278,7 @@ impl Position{
         let src:usize = mv.parse_from() as usize;
         let dest:usize = mv.parse_to() as usize;
         let mtype = mv.parse_mtype().unwrap();
+        
         //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
         match mtype{
             MType::Quiet =>{
@@ -347,7 +348,7 @@ impl Position{
             MType::KingsideCastle => {},
             MType::QueensideCastle => {},
             MType::Capture =>{
-                let opponent_color:Color = self.get_opponent_color(self.turn);
+                let opponent_color:Color = Position::get_opponent_color(self.turn);
                 let captured_piece = self.recent_capture;
                 self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
                 let piece:&mut Piece = self.pieces[self.turn as usize].get_piece_from_sq(dest).unwrap();
@@ -359,10 +360,10 @@ impl Position{
             MType::EnPassant =>{},
             MType::None=>{}
         }
-        self.update_occupied_bitboard()
+        self.update_occupied_bitboard();
     }
 
-    pub fn get_opponent_color(&self,color:Color)->Color{
+    pub fn get_opponent_color(color:Color)->Color{
         if color == Color::WHITE{
             return Color::BLACK
         }
@@ -385,6 +386,13 @@ impl Position{
             zobrist_hash_key ^= self.zobrist_hash.black_to_move;
         }
         zobrist_hash_key
+    }
+
+    pub fn switch_turn(&mut self){
+        self.turn = match self.turn{
+            Color::BLACK => Color::WHITE,
+            Color::WHITE=>Color::BLACK
+        };
     }
 }
 

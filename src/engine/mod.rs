@@ -4,7 +4,9 @@ pub mod evaluation;
 pub mod move_generation;
 pub mod position;
 pub mod search;
-use position::{Position};
+use crate::engine::position::{Position};
+use crate::engine::search::*;
+use self::move_generation::moves::Move;
 
 
 pub struct Engine{
@@ -25,7 +27,22 @@ impl Engine{
         }
     }
 
-    pub fn get_best_move_depth(&self,depth: usize){
-        //perform move-gen, evaluate and quiescence search somewhere
+    pub fn get_best_move_depth(&mut self,depth: u8)->Option<Move>{
+        for di in 1..depth+1{
+            self.search.alphabeta(
+                &mut self.position, 
+                &mut self.move_generator,
+                &mut self.evaluator, 
+                depth, 
+                isize::MIN, 
+                isize::MAX
+            );
+        }
+        let best_move: Option<Move> = match self.search.transposition_table.get_entry(self.position.get_zobrist_hash()){
+            Some(x)=> Some(x.best_move.to_owned()),
+            None=> None
+        };
+        best_move
+        
     }
 }

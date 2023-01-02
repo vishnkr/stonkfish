@@ -382,7 +382,7 @@ impl MoveGenerator{
     pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
         let mut move_masks :Vec<MoveMask> = Vec::new();
         let color = cur_position.turn;
-        let opponent_bb = &cur_position.get_opponent_position_bb(color);
+        let opponent_bb =  &cur_position.position_bitboard & !&cur_position.pieces[color as usize].occupied;
         let player_bb = &cur_position.pieces[color as usize].occupied;
         let occupancy = &cur_position.position_bitboard;
         let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|{
@@ -394,7 +394,7 @@ impl MoveGenerator{
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
-                    PieceType::Pawn => self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,opponent_bb),
+                    PieceType::Pawn => self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,&opponent_bb),
                     _ => self.attack_table.get_knight_attacks(pos),
                 };
                 
@@ -435,23 +435,24 @@ impl MoveGenerator{
     pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
         position.make_move(mv);
         let mut is_under_check = false;
-        let opponent_color = position.get_opponent_color(position.turn);
-        let opponent_bb = position.get_opponent_position_bb(position.turn);
-        if self.is_king_under_check(position,position.turn,(opponent_color,&opponent_bb)){
-            is_under_check = true
+        
+        if self.is_king_under_check(position){
+            is_under_check = true;
         }
         position.unmake_move(mv);
         !is_under_check
     }
 
-    pub fn is_king_under_check(&self,position:&mut Position,color:Color,opponent_info:(Color,&Bitboard))-> bool{
+    pub fn is_king_under_check(&self,position:&mut Position)-> bool{
         let pieces = &mut position.pieces;
-        let mut opponent_clone = opponent_info.1.clone();
+        let color = position.turn.clone();
+        let opponent_color = Position::get_opponent_color(position.turn);
+        let mut opponent_bb =  &position.position_bitboard & !&pieces[color as usize].occupied;
         let occupancy = &position.position_bitboard;
 
-        while !opponent_clone.is_zero(){
-                let mut pos = opponent_clone.lowest_one().unwrap_or(0) as u8;
-                let piece = pieces[opponent_info.0 as usize].get_piece_from_sq(pos.into()).unwrap();
+        while !opponent_bb.is_zero(){
+                let mut pos = opponent_bb.lowest_one().unwrap_or(0) as u8;
+                let piece = pieces[opponent_color as usize].get_piece_from_sq(pos.into()).unwrap();
                 let mut attack_bb = match piece.piece_type{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
                     PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
@@ -460,14 +461,14 @@ impl MoveGenerator{
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
                     PieceType::Pawn => {
                         let player_bb = &pieces[color as usize].occupied;
-                        self.attack_table.get_pawn_attacks(pos,opponent_info.0,&opponent_clone)
+                        self.attack_table.get_pawn_attacks(pos,opponent_color,&opponent_bb)
                     },
                     _ => self.attack_table.get_knight_attacks(pos),
                 };
                 if !(attack_bb & &pieces[color as usize].king.bitboard).is_zero(){
                     return true
                 }
-                opponent_clone.set_bit(pos.into(),false);
+                opponent_bb.set_bit(pos.into(),false);
         }
 
         false

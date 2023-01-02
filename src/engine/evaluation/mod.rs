@@ -24,8 +24,10 @@ impl Evaluator{
     }
 
     pub fn evaluate(&mut self,position:&mut Position)->isize{
+        //TODO: add positional eval score
         self.get_material_eval_score(position)
     }
+
     pub fn calc_material_score(&mut self,piece_set: &PieceSet)->isize{
         let material_score = piece_set.king.bitboard.count_ones() as isize * KING_CP_SCORE + 
         piece_set.pawn.bitboard.count_ones() as isize * PAWN_CP_SCORE + 
