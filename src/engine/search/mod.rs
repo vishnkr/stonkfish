@@ -62,7 +62,7 @@ impl Search{
         // better move found
         if old_alpha!=alpha{
             let best_move = cur_best_move;
-            self.transposition_table.insert(position.get_zobrist_hash(), TableEntry { key: position.get_zobrist_hash(), node_type: NodeType::Exact, value: best_score, depth: depth, best_move: best_move })
+            self.transposition_table.insert(position.get_zobrist_hash(), TableEntry { key: position.get_zobrist_hash(), node_type: NodeType::Exact, score: best_score, depth: depth, best_move: best_move })
         }
         alpha
     }

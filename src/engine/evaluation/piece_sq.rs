@@ -32,7 +32,6 @@ impl PieceSquareTables{
                 for rank in 0..dimensions.height{
                     for file in 0..dimensions.width{
                         let pos = to_pos(rank,file);
-                        println!("{} {} {}",piece_sq_table.len(),rank,file);
                         let value = match(rank,file){
                             (1,_)=>{
                                 if dimensions.width%2==0 && (file == mid.ceil() as u8 || file== mid.floor() as u8){

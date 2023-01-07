@@ -9,6 +9,7 @@ use super::bitboard::display_bitboard_with_board_desc;
 
 pub mod zobrist;
 
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum PieceType{
     Pawn,

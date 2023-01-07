@@ -14,7 +14,7 @@ pub enum NodeType{
 pub struct TableEntry{
     pub key: ZobristKey,
     pub node_type: NodeType,
-    pub value: usize,
+    pub score: isize,
     pub depth: u8,
     pub best_move: Move,
 }
@@ -25,7 +25,7 @@ impl TableEntry{
         Self{
             key:0,
             node_type: NodeType::None,
-            value: 0,
+            score: 0,
             depth: 0,
             best_move : Move::new(0,0,MType::None)
         }
