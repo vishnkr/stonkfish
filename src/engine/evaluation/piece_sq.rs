@@ -80,6 +80,6 @@ mod psqt_tests{
     use super::*;
     #[test]
     pub fn test_rook_psqt(){
-        let psqt = PieceSquareTables::new(Dimensions{width:16,height:16});
+        
     }
 }

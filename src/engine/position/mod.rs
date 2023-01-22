@@ -1,4 +1,5 @@
 use core::fmt;
+use std::ops::Not;
 
 use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard, to_row, to_col};
 use crate::engine::move_generation::moves::*;
@@ -48,6 +49,17 @@ pub enum Color{
     WHITE,
     BLACK
 }
+
+impl Not for Color {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Color::BLACK => Color::WHITE,
+            Color::WHITE => Color::BLACK
+        }
+    }
+}
+
 
 #[derive(Debug,PartialEq)]
 pub struct Piece{
@@ -279,17 +291,21 @@ impl Position{
         let src:usize = mv.parse_from() as usize;
         let dest:usize = mv.parse_to() as usize;
         let mtype = mv.parse_mtype().unwrap();
-        
+        let opponent_color =!self.turn;
         //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
         match mtype{
             MType::Quiet =>{
                 self.move_piece(self.turn, (src,dest));
             },
-            MType::KingsideCastle => {},
-            MType::QueensideCastle => {},
+            MType::KingsideCastle => {
+                self.move_piece(self.turn, (src,dest));
+                
+            },
+            MType::QueensideCastle => {
+                self.move_piece(self.turn, (src,dest));
+            },
             MType::Capture =>{
-                let mut opponent_color = Color::WHITE;
-                if self.turn == Color::WHITE{ opponent_color = Color::BLACK }
+                
                 let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
                 self.recent_capture = Some((captured_piece.piece_type,captured_piece.piece_repr));
                 self.remove_piece(opponent_color,dest);
@@ -389,11 +405,19 @@ impl Position{
         zobrist_hash_key
     }
 
-    pub fn switch_turn(&mut self){
-        self.turn = match self.turn{
-            Color::BLACK => Color::WHITE,
-            Color::WHITE=>Color::BLACK
-        };
+    pub fn switch_turn(&mut self){ self.turn = !self.turn }
+
+    pub fn valid_kingside_castle(&self)->bool{
+        match self.turn{
+            Color::BLACK=> ((self.castling_rights >> 6) & 1) == 1,
+            Color::WHITE=> ((self.castling_rights >> 2)) & 1 == 1
+        }
+    }
+    pub fn valid_queenside_castle(&self)->bool{
+        match self.turn{
+            Color::BLACK=> ((self.castling_rights >> 4) & 1) == 1,
+            Color::WHITE=> ((self.castling_rights)) & 1 == 1
+        }
     }
 }
 

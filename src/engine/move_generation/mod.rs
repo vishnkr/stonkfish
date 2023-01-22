@@ -1,7 +1,10 @@
 use moves::*;
 use numext_fixed_uint::u256;
-use crate::engine::position::*;
-use crate::engine::bitboard::*;
+use crate::engine::{
+    bitboard::*,
+    position::*,
+    utils::get_rank_attacks,
+};
 use std::vec::Vec;
 use arrayvec::ArrayVec;
 use std::collections::HashMap;
@@ -101,15 +104,7 @@ impl AttackTable{
     }
     
     pub fn gen_occupancy_lookup()->Vec<Vec<u16>>{
-        fn get_rank_attacks(is_right:bool,pos:u16)->u16{
-            if is_right{
-                if pos != 0 {
-                    return pos-1
-                }
-                return 0u16
-            }
-            !pos & !get_rank_attacks(true,pos)
-        };
+        
 
         const TOTAL_OCCUPANCY_POSSIBILITES:u16 = u16::MAX;
         let mut occupancy_lookup = vec![vec![0; TOTAL_OCCUPANCY_POSSIBILITES.into()];16];
@@ -414,9 +409,51 @@ impl MoveGenerator{
             
         };
 
+
         let piece_set = &cur_position.pieces[cur_position.turn as usize].as_array();
         for piece in piece_set{
             gen_piece_moves_bb(piece.piece_type,(&piece.bitboard).to_owned());
+        }
+
+        let mut moves:Vec<Move> = vec![];
+        let king_pos = cur_position.pieces[color as usize].king.bitboard.lowest_one().unwrap() as u8;
+        if cur_position.valid_kingside_castle(){
+            // is rook in position, is path blocked and will king move into check after 1 move
+            let target_rank = to_row(king_pos as u8);
+            let target_rook_pos = (16*target_rank+1)-1;
+            if let Some(ref piece) = cur_position.pieces[color as usize].get_piece_from_sq(target_rook_pos.into()){
+                if piece.piece_type == PieceType::Rook{
+                    let mut rank_attack = Bitboard::from(get_rank_attacks(true, king_pos as u16));
+                    rank_attack &= &cur_position.position_bitboard;
+                    rank_attack.set_bit(target_rook_pos.into(), false);
+                    let dest = to_pos(king_pos, king_pos+1) as u8;
+                    if rank_attack.is_zero(){
+                        let skipped_mv = Move::new(king_pos, dest, MType::Quiet,None);
+                        if self.is_legal_move(cur_position, &skipped_mv){
+                            moves.push(Move::new(king_pos, king_pos+2, MType::KingsideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
+                        }
+                    }
+                }
+                
+            }
+        }
+        if cur_position.valid_queenside_castle(){
+            let target_rank = to_row(king_pos as u8);
+            let target_rook_pos = (16*target_rank);
+            if let Some(piece) = cur_position.pieces[color as usize].get_piece_from_sq(target_rook_pos.into()){
+                if piece.piece_type == PieceType::Rook{
+                    let mut rank_attack = Bitboard::from(get_rank_attacks(false, king_pos as u16));
+                    rank_attack &= &cur_position.position_bitboard;
+                    rank_attack.set_bit(target_rook_pos.into(), false);
+                    let dest = to_pos(king_pos, king_pos-1) as u8;
+                    if rank_attack.is_zero(){
+                        let skipped_mv = Move::new(king_pos, dest, MType::Quiet,None);
+                        if self.is_legal_move(cur_position, &skipped_mv){
+                            moves.push(Move::new(king_pos, king_pos-2, MType::QueensideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
+                        }
+                    }
+                }
+            }
         }
         
         move_masks.into_iter().flatten()

@@ -26,7 +26,7 @@ impl Search{
             return evaluator.evaluate(position) //(quiescense here later)
         }
 
-        let mut cur_best_move: Move = Move::new(0,0,MType::None);
+        let mut cur_best_move: Move = Move::new(0,0,MType::None,None);
         let best_score = 0;
         let old_alpha = alpha;
 
@@ -41,6 +41,7 @@ impl Search{
             if !move_generator.is_legal_move(position,&mv){
                 continue
             }
+            
             position.make_move(&mv);
             position.switch_turn();
             let mut score = -self.alphabeta(position,move_generator,evaluator,depth-1,-beta,-alpha);

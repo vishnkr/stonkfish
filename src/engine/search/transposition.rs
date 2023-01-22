@@ -2,7 +2,7 @@ use crate::engine::{move_generation::moves::{Move,MType}, position::zobrist::Zob
 
 const ENTRIES_PER_BUCKET: usize = 4;
 
-#[derive(Copy,Clone)]
+#[derive(Copy,Clone,PartialEq)]
 pub enum NodeType{
     Exact,
     Alpha,
@@ -27,7 +27,7 @@ impl TableEntry{
             node_type: NodeType::None,
             score: 0,
             depth: 0,
-            best_move : Move::new(0,0,MType::None)
+            best_move : Move::new(0,0,MType::None,None)
         }
     }
 }
@@ -61,7 +61,7 @@ impl TranspositionTable{
         let bucket  = key as usize % self.size ;
         let mut min_depth_index = 0;
         for i in 1..ENTRIES_PER_BUCKET {
-            if self.buckets[bucket].values[i].depth < value.depth{
+            if self.buckets[bucket].values[i].node_type != NodeType::None && self.buckets[bucket].values[i].depth < value.depth{
                 min_depth_index = i;
             }
         }

@@ -18,6 +18,11 @@ pub enum MType{
     None
 }
 
+pub enum AdditionalInfo {
+    PromoPieceType(char),
+    CastlingRookPos(u8)
+}
+
 impl fmt::Display for MType{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
         match self{
@@ -49,8 +54,8 @@ impl fmt::Debug for MType{
 //encoding based on chessprogramming wiki - https://www.chessprogramming.org/Encoding_Moves
 
 impl Move{
-    pub fn new(src:u8,dest:u8,mtype:MType)->Move{
-        Move(
+    pub fn new(src:u8,dest:u8,mtype:MType,additional_info: Option<AdditionalInfo>)->Move{
+        let mut value  =
             (((0 | (src as u32))<< 16u32) | (dest as u32) << 8u32)| 
             match mtype {
                 MType::Quiet => 0,
@@ -60,8 +65,24 @@ impl Move{
                 MType::QueensideCastle => 4u32,
                 MType::EnPassant => 5u32,
                 MType::None => 6u32
-            }).into()
+            };
+            if let Some(additional_info) = additional_info {
+                match additional_info {
+                    AdditionalInfo::PromoPieceType(c) => {
+                        let mut promo_value = c as u32;
+                        promo_value = (promo_value << 24) & 0xff000000;
+                        value |= promo_value;
+                    },
+                    AdditionalInfo::CastlingRookPos(pos) => {
+                        let mut pos_value = pos as u32;
+                        pos_value = (pos_value << 24) & 0xff000000;
+                        value |= pos_value;
+                    },
+                }
+            }
+        Move(value)
     }
+
     pub fn make_move(&self){
         println!("{}",format!("{:b}", self));
     }
@@ -73,7 +94,6 @@ impl Move{
     }
     pub fn parse_mtype(&self)->Option<MType>{
         let mtype = (self.0 & 0xFF) as u32;
-        //println!("mtype {}",mtype);
         match mtype {
             0 => Some(MType::Quiet),
             1u32 => Some(MType::Capture),
@@ -107,7 +127,7 @@ impl Iterator for MoveMask{
         if self.opponent.bit(dest_pos).unwrap(){
             mtype = MType::Capture;
         }
-        Some(Move::new(self.src, dest_pos as u8, mtype))
+        Some(Move::new(self.src, dest_pos as u8, mtype, None))
     }
 }
 
