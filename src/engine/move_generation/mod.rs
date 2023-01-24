@@ -203,7 +203,7 @@ impl AttackTable{
                 }
             }
         };
-        ((single_push | double_push) & !opponent)
+        (single_push | double_push) & !opponent
     }
 
     pub fn get_pawn_attacks_and_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
@@ -387,7 +387,7 @@ impl MoveGenerator{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
                     PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
-                    PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
+                    PieceType::Queen => self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
                     PieceType::Pawn => self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,&opponent_bb),
                     _ => self.attack_table.get_knight_attacks(pos),
@@ -439,7 +439,7 @@ impl MoveGenerator{
         }
         if cur_position.valid_queenside_castle(){
             let target_rank = to_row(king_pos as u8);
-            let target_rook_pos = (16*target_rank);
+            let target_rook_pos = 16*target_rank;
             if let Some(piece) = cur_position.pieces[color as usize].get_piece_from_sq(target_rook_pos.into()){
                 if piece.piece_type == PieceType::Rook{
                     let mut rank_attack = Bitboard::from(get_rank_attacks(false, king_pos as u16));
@@ -494,7 +494,7 @@ impl MoveGenerator{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
                     PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
-                    PieceType::Queen => (self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy)),
+                    PieceType::Queen => self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
                     PieceType::Pawn => {
                         let player_bb = &pieces[color as usize].occupied;

@@ -123,7 +123,7 @@ impl Iterator for MoveMask{
             None=> return None
         };
         self.bitboard.set_bit(dest_pos,false);
-;        let mut mtype = MType::Quiet;
+        let mut mtype = MType::Quiet;
         if self.opponent.bit(dest_pos).unwrap(){
             mtype = MType::Capture;
         }
