@@ -5,6 +5,7 @@ use std::collections::hash_map::RandomState;
 use arrayvec::ArrayVec;
 pub use crate::engine::position::{Position,PieceSet,PieceType};
 pub use crate::engine::move_generation::{SlideDirection};
+use super::bitboard::Bitboard;
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
@@ -23,12 +24,12 @@ impl Evaluator{
         Evaluator{piece_sq_table: HashMap::with_hasher(RandomState::new())}
     }
 
-    pub fn evaluate(&mut self,position:&mut Position)->isize{
+    pub fn evaluate<T:Bitboard>(&mut self,position:&mut Position<T>)->isize{
         //TODO: add positional eval score
         self.get_material_eval_score(position)
     }
 
-    pub fn calc_material_score(&mut self,piece_set: &PieceSet)->isize{
+    pub fn calc_material_score<T:Bitboard>(&mut self,piece_set: &PieceSet<T>)->isize{
         let material_score = piece_set.king.bitboard.count_ones() as isize * KING_CP_SCORE + 
         piece_set.pawn.bitboard.count_ones() as isize * PAWN_CP_SCORE + 
         piece_set.queen.bitboard.count_ones() as isize * QUEEN_CP_SCORE + 
@@ -38,7 +39,7 @@ impl Evaluator{
         material_score
     }
 
-    pub fn get_material_eval_score(&mut self,position:&mut Position)->isize{
+    pub fn get_material_eval_score<T:Bitboard>(&mut self,position:&mut Position<T>)->isize{
         let mut total_score = 0;
         for piece_set in position.pieces.iter(){
             println!("ts {}",self.calc_material_score(piece_set));

@@ -108,10 +108,10 @@ impl Move{
 
 // contains bitboard with all possible moves for a piece which can be iterated to get a list of moves
 pub struct MoveMask{
-    pub bitboard: Bitboard,
+    pub bitboard: Bitboard256,
     pub src: u8,
     pub piece_type: PieceType,
-    pub opponent:Bitboard
+    pub opponent:Bitboard256
 }
 
 impl Iterator for MoveMask{
@@ -151,9 +151,6 @@ impl fmt::Display for Move{
         let mtype = self.parse_mtype().unwrap().to_string();
         let dest_pos = self.parse_to();
         let src_pos = self.parse_from();
-        let src_pos = self.parse_from();
-        let src_coords = (to_row(src_pos as u8),to_col(src_pos as u8));
-        let dest_coords = (to_row(dest_pos as u8),to_col(dest_pos as u8));
-        write!(f,"Move {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,src_pos,src_coords.0,src_coords.1,dest_pos,dest_coords.0,dest_coords.1)
+        write!(f,"Move {} from {} to {} ",mtype,src_pos,dest_pos)
     }
 }

@@ -5,12 +5,13 @@ use engine::{
     evaluation::Evaluator,
     position::Position,
     transposition::*,
+    bitboard::*
     };
 
-pub struct Engine{
-    move_generator: MoveGenerator,
+pub struct Engine<T: Bitboard>{
+    move_generator: MoveGenerator<T>,
     evaluator: Evaluator,
-    position: Position,
+    position: Position<T>,
     transposition_table: TranspositionTable,
     search_stats: SearchStats
 }
@@ -20,9 +21,9 @@ pub struct SearchStats{
 }
 const TEST_SIZE:usize = 1000000;
 
-impl Engine{
-    pub fn new(fen:String)->Engine{
-        let position : Position = Position::new(fen);
+impl <T:Bitboard> Engine<T>{
+    pub fn new(fen:String)->Engine<T>{
+        let position = Position::<T>::new(fen);
         Engine{
             move_generator: MoveGenerator::new(position.dimensions.clone()),
             evaluator: Evaluator::new(),
@@ -32,7 +33,7 @@ impl Engine{
         }
     }
 
-    pub fn alphabeta(&mut self,depth:u8,mut alpha:isize,mut beta:isize)->isize{
+    fn alphabeta(&mut self,depth:u8,mut alpha:isize,mut beta:isize)->isize{
         if depth==0{
             return self.evaluator.evaluate(&mut self.position) //(quiescense here later)
         }

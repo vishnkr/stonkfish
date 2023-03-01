@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use crate::engine::position::*;
-use crate::engine::bitboard::{to_pos};
+use crate::engine::bitboard::{to_pos,BitboardType};
 
 type PieceSquareTable = ArrayVec<i8,256>;
 
@@ -23,7 +23,13 @@ impl PieceSquareTables{
 
     pub fn setup_piece_sq_table(dimensions:Dimensions,piece_type:PieceType)->PieceSquareTable{
         let mut piece_sq_table:PieceSquareTable = PieceSquareTable::new(); //with_capacity(dimensions.width * dimensions.height);
+        let bbtype = if dimensions.width>8 || dimensions.height>8{
+            BitboardType::Bitboard256
+        } else {
+            BitboardType::Bitboard64
+        };
         match piece_type{
+            
             PieceType::Rook =>{
                 // white rooks are stronger usually on the seventh rank/ rank before kings starting rank,
                 // assuming most games start with the  king in the 1st and last rank
@@ -31,7 +37,7 @@ impl PieceSquareTables{
                 let mid: f32 = (dimensions.width /2).into();
                 for rank in 0..dimensions.height{
                     for file in 0..dimensions.width{
-                        let pos = to_pos(rank,file);
+                        let pos = to_pos(rank,file,bbtype);
                         let value = match(rank,file){
                             (1,_)=>{
                                 if dimensions.width%2==0 && (file == mid.ceil() as u8 || file== mid.floor() as u8){
