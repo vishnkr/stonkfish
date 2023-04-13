@@ -54,7 +54,7 @@ impl fmt::Debug for MType{
 //encoding based on chessprogramming wiki - https://www.chessprogramming.org/Encoding_Moves
 
 impl Move{
-    pub fn new(src:u8,dest:u8,mtype:MType,additional_info: Option<AdditionalInfo>)->Move{
+    pub fn encode_move(src:u8,dest:u8,mtype:MType,additional_info: Option<AdditionalInfo>)->Move{
         let mut value  =
             (((0 | (src as u32))<< 16u32) | (dest as u32) << 8u32)| 
             match mtype {
@@ -83,16 +83,16 @@ impl Move{
         Move(value)
     }
 
-    pub fn make_move(&self){
+    pub fn display_move(&self){
         println!("{}",format!("{:b}", self));
     }
-    pub fn parse_from(&self)->u8{
+    pub fn get_src_square(&self)->u8{
         ((self.0 >>16) & 0xFF) as u8
     }
-    pub fn parse_to(&self)->u8{
+    pub fn get_dest_square(&self)->u8{
         ((self.0 >>8) & 0xFF) as u8
     }
-    pub fn parse_mtype(&self)->Option<MType>{
+    pub fn get_mtype(&self)->Option<MType>{
         let mtype = (self.0 & 0xFF) as u32;
         match mtype {
             0 => Some(MType::Quiet),
@@ -127,7 +127,7 @@ impl Iterator for MoveMask{
         if self.opponent.bit(dest_pos).unwrap(){
             mtype = MType::Capture;
         }
-        Some(Move::new(self.src, dest_pos as u8, mtype, None))
+        Some(Move::encode_move(self.src, dest_pos as u8, mtype, None))
     }
 }
 
@@ -139,21 +139,21 @@ impl fmt::Binary for Move {
 
 impl fmt::Debug for Move{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
-        let mtype = self.parse_mtype().unwrap().to_string();
-        let dest_pos = self.parse_to();
-        let src_pos = self.parse_from();
+        let mtype = self.get_mtype().unwrap().to_string();
+        let dest_pos = self.get_dest_square();
+        let src_pos = self.get_src_square();
         write!(f,"Move {} from {} to {}",mtype,src_pos,dest_pos)
     }
 }
 
 impl fmt::Display for Move{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
-        let mtype = self.parse_mtype().unwrap().to_string();
-        let dest_pos = self.parse_to();
-        let src_pos = self.parse_from();
-        let src_pos = self.parse_from();
+        let mtype = self.get_mtype().unwrap().to_string();
+        let dest_pos = self.get_dest_square();
+        let src_pos = self.get_src_square();
+        let src_pos = self.get_src_square();
         let src_coords = (to_row(src_pos as u8),to_col(src_pos as u8));
         let dest_coords = (to_row(dest_pos as u8),to_col(dest_pos as u8));
-        write!(f,"Move {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,src_pos,src_coords.0,src_coords.1,dest_pos,dest_coords.0,dest_coords.1)
+        write!(f," {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,sq_to_notation(src_pos),src_coords.0,src_coords.1,sq_to_notation(dest_pos),dest_coords.0,dest_coords.1)
     }
 }

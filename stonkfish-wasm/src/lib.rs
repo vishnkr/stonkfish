@@ -32,9 +32,9 @@ impl Stonkfish{
     pub fn get_best_move(&mut self,depth:u8)->String{
         let best_move = self.engine.get_best_move_depth(depth).unwrap();
         let json = MoveJSON{
-            src : best_move.parse_from(),
-            dest :best_move.parse_to(),
-            mtype : best_move.parse_mtype().unwrap().to_string()
+            src : best_move.get_src_square(),
+            dest :best_move.get_dest_square(),
+            mtype : best_move.get_mtype().unwrap().to_string()
         };
         serde_json::to_string(&json).unwrap()
     }

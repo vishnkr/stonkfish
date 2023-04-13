@@ -1,10 +1,11 @@
 mod piece_sq;
 
 use std::collections::HashMap;
-use std::collections::hash_map::RandomState;
 use arrayvec::ArrayVec;
 pub use crate::engine::position::{Position,PieceSet,PieceType};
-pub use crate::engine::move_generation::{SlideDirection};
+pub use crate::engine::move_generation::att_table::SlideDirection;
+
+use self::piece_sq::PieceSquareTables;
 //centipawn scores
 const KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
@@ -15,12 +16,12 @@ const QUEEN_CP_SCORE:isize = 900;
 const DIAGONAL_SCORE:isize = 90;
 
 pub struct Evaluator{
-    piece_sq_table: HashMap<PieceType,Vec<usize>,RandomState>
+    piece_sq_table: PieceSquareTables
 }
 
 impl Evaluator{
-    pub fn new()->Self{
-        Evaluator{piece_sq_table: HashMap::with_hasher(RandomState::new())}
+    pub fn new(position: &Position)->Self{
+        Evaluator{piece_sq_table: PieceSquareTables::new(position)}
     }
 
     pub fn evaluate(&mut self,position:&mut Position)->isize{

@@ -1,16 +1,16 @@
 
 mod engine;
 use engine::{
-    move_generation::{MoveGenerator,moves::*},
+    move_generation::{MoveGenerator,moves::*, generate_legal_moves},
     evaluation::Evaluator,
     position::Position,
     transposition::*,
     };
 
 pub struct Engine{
-    move_generator: MoveGenerator,
+    pub move_generator: MoveGenerator,
     evaluator: Evaluator,
-    position: Position,
+    pub position: Position,
     transposition_table: TranspositionTable,
     search_stats: SearchStats
 }
@@ -25,7 +25,7 @@ impl Engine{
         let position : Position = Position::new(fen);
         Engine{
             move_generator: MoveGenerator::new(position.dimensions.clone()),
-            evaluator: Evaluator::new(),
+            evaluator: Evaluator::new(&position),
             position: position,
             transposition_table: TranspositionTable::new(TEST_SIZE),
             search_stats: SearchStats { node_count: 0 }
@@ -37,7 +37,7 @@ impl Engine{
             return self.evaluator.evaluate(&mut self.position) //(quiescense here later)
         }
 
-        let mut cur_best_move: Move = Move::new(0,0,MType::None,None);
+        let mut cur_best_move: Move = Move::encode_move(0,0,MType::None,None);
         let best_score = 0;
         let old_alpha = alpha;
 
@@ -54,9 +54,7 @@ impl Engine{
             }
             
             self.position.make_move(&mv);
-            self.position.switch_turn();
             let mut score = -self.alphabeta(depth-1,-beta,-alpha);
-            self.position.switch_turn();
             self.position.unmake_move(&mv);
             legal_move_count+=1;
             if score > alpha {
@@ -94,4 +92,21 @@ impl Engine{
         best_move
         
     }
+
+    pub fn perft(&mut self,depth: u32)->u64{
+        if (depth==0){
+            return 1;
+        }
+        let mut nodes = 0;
+        let moves = generate_legal_moves(&self.move_generator, &mut self.position); //engine.move_generator.generate_pseudolegal_moves(&mut engine.position);
+        for mv in moves{
+            self.position.make_move(&mv);
+            let count = self.perft(depth-1);
+            nodes+=count;
+            println!("Depth {}, Move {}, Count {}", depth, mv, count);
+            self.position.unmake_move(&mv);
+        }
+        return nodes
+    }
 }
+

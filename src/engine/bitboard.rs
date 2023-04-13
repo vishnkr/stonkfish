@@ -14,6 +14,17 @@ pub fn to_row(pos:u8)->u8{
     pos/16
 }
 
+
+pub fn rowcol_to_notation(row:u8,col:u8)->String{ 
+    let row_char = (b'1' + row) as char;
+    let col_char = (b'a' + col) as char;
+    format!("{}{}", col_char, row_char)
+ }
+
+pub fn sq_to_notation(pos:u8)->String{
+    return rowcol_to_notation(to_row(pos),to_col(pos))
+}
+
 pub fn display_bitboard(bitboard:&Bitboard)->String{
     let mut bb_string = String::new().to_owned();
     bb_string.push_str("  1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 \n");

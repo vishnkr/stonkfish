@@ -288,9 +288,9 @@ impl Position{
     }
 
     pub fn make_move(&mut self,mv:&Move){
-        let src:usize = mv.parse_from() as usize;
-        let dest:usize = mv.parse_to() as usize;
-        let mtype = mv.parse_mtype().unwrap();
+        let src:usize = mv.get_src_square() as usize;
+        let dest:usize = mv.get_dest_square() as usize;
+        let mtype = mv.get_mtype().unwrap();
         let opponent_color =!self.turn;
         //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
         match mtype{
@@ -316,6 +316,7 @@ impl Position{
             MType::None => {},
         }
         self.update_occupied_bitboard();
+        self.switch_turn();
         
     }
 
@@ -353,13 +354,14 @@ impl Position{
     }
 
     pub fn unmake_move(&mut self,mv:&Move){
-        let src:usize = mv.parse_from() as usize;
-        let dest:usize = mv.parse_to() as usize;
-        let mtype = mv.parse_mtype().unwrap_or(MType::Quiet);
+        let src:usize = mv.get_src_square() as usize;
+        let dest:usize = mv.get_dest_square() as usize;
+        let mtype = mv.get_mtype().unwrap_or(MType::Quiet);
         //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(dest).unwrap();
-        
+        self.switch_turn();
         match mtype{
             MType::Quiet =>{
+                //println!("turn {:?}",self.turn);
                 self.move_piece(self.turn,(dest,src));
             },
             MType::KingsideCastle => {},
@@ -378,6 +380,7 @@ impl Position{
             MType::None=>{}
         }
         self.update_occupied_bitboard();
+        
     }
 
     pub fn get_opponent_color(color:Color)->Color{

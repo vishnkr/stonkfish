@@ -27,7 +27,7 @@ impl TableEntry{
             node_type: NodeType::None,
             score: 0,
             depth: 0,
-            best_move : Move::new(0,0,MType::None,None)
+            best_move : Move::encode_move(0,0,MType::None,None)
         }
     }
 }
