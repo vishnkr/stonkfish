@@ -12,9 +12,11 @@ mod engine_tests{
     #[test]
     pub fn test_perft(){
         //expected - 1: 20, 2: 400, 3: 8907, 4: 197281, 5: 4865609
-        let depth = 4;
+        let depth = 5;
         
         let mut engine = Engine::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".to_string());
+        
         println!("Generated {} moves at depth {}, Color {:#?}",engine.perft(depth),depth, engine.position.turn);
+        engine.stats.move_gen_stats.display_stats();
     }
 }

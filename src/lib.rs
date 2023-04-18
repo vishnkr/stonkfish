@@ -5,20 +5,19 @@ use engine::{
     evaluation::Evaluator,
     position::Position,
     transposition::*,
+    stats::*
     };
 
 pub struct Engine{
     pub move_generator: MoveGenerator,
-    evaluator: Evaluator,
+    pub evaluator: Evaluator,
     pub position: Position,
     transposition_table: TranspositionTable,
-    search_stats: SearchStats
+    pub stats: Stats
 }
 
-pub struct SearchStats{
-    pub node_count: u32
-}
-const TEST_SIZE:usize = 1000000;
+
+const TEST_TT_SIZE:usize = 254288000;
 
 impl Engine{
     pub fn new(fen:String)->Engine{
@@ -27,8 +26,8 @@ impl Engine{
             move_generator: MoveGenerator::new(position.dimensions.clone()),
             evaluator: Evaluator::new(&position),
             position: position,
-            transposition_table: TranspositionTable::new(TEST_SIZE),
-            search_stats: SearchStats { node_count: 0 }
+            transposition_table: TranspositionTable::new(TEST_TT_SIZE),
+            stats: Stats::new()
         }
     }
 
@@ -41,7 +40,7 @@ impl Engine{
         let best_score = 0;
         let old_alpha = alpha;
 
-        self.search_stats.node_count+=1;
+        self.stats.search_stats.node_count+=1;
 
         let in_check = self.move_generator.is_king_under_check(&mut self.position);
         let mut legal_move_count = 0;
@@ -72,7 +71,13 @@ impl Engine{
         // better move found
         if old_alpha!=alpha{
             let best_move = cur_best_move;
-            self.transposition_table.insert(self.position.get_zobrist_hash(), TableEntry { key: self.position.get_zobrist_hash(), node_type: NodeType::Exact, score: best_score, depth: depth, best_move: best_move })
+            self.transposition_table.insert(TableEntry { 
+                key: self.position.get_zobrist_hash(), 
+                node_type: NodeType::Exact, 
+                score: best_score, 
+                depth: depth, 
+                best_move: best_move 
+            });
         }
         alpha
     }
@@ -85,7 +90,7 @@ impl Engine{
                 isize::MAX
             );
         }
-        let best_move: Option<Move> = match self.transposition_table.get_entry(self.position.get_zobrist_hash()){
+        let best_move: Option<Move> = match self.transposition_table.lookup(self.position.get_zobrist_hash()){
             Some(x)=> Some(x.best_move.to_owned()),
             None=> None
         };
@@ -100,13 +105,14 @@ impl Engine{
         let mut nodes = 0;
         let moves = generate_legal_moves(&self.move_generator, &mut self.position); //engine.move_generator.generate_pseudolegal_moves(&mut engine.position);
         for mv in moves{
+            self.stats.move_gen_stats.update_move_type_count(&mv);
             self.position.make_move(&mv);
             let count = self.perft(depth-1);
             nodes+=count;
-            println!("Depth {}, Move {}, Count {}", depth, mv, count);
+            //println!("Depth {}, Move {}, Count {}", depth, mv, count);
             self.position.unmake_move(&mv);
         }
+        
         return nodes
     }
 }
-

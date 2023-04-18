@@ -2,10 +2,14 @@ use crate::engine::{move_generation::moves::{Move,MType}, position::zobrist::Zob
 
 const ENTRIES_PER_BUCKET: usize = 4;
 
+/// Represents type of a search node in the transposition table.
 #[derive(Copy,Clone,PartialEq)]
 pub enum NodeType{
+    /// A search node with an exact score.
     Exact,
+    /// A search node with a lower-bound score (alpha).
     Alpha,
+    /// A search node with an upper-bound score (beta).
     Beta,
     None
 }
@@ -38,12 +42,46 @@ pub struct Bucket{
 }
 
 impl Bucket{
+
     pub fn new()->Self{
         Bucket{
             values: [TableEntry::new();ENTRIES_PER_BUCKET]
         }
     }
+
+    /// Retrieve bucket with matching zobrist key
+    pub fn get(&self,key:ZobristKey)->Option<&TableEntry>{
+        for entry in &self.values{
+            if entry.key == key{
+                return Some(entry);
+            }
+        }
+        None
+    }
+
+    /// Go through the entries in the bucket and find an empty slot or a slot with a matching key
+    pub fn put(&mut self,entry:TableEntry){
+        let mut idx = 0;
+        let mut replace = true;
+        let mut min_depth = self.values[0].depth;
+        for i in 0..ENTRIES_PER_BUCKET{
+            if self.values[i].key == entry.key{
+                idx= i;
+                replace = true;
+                break;
+            } else if self.values[i].depth <min_depth{
+                idx = i;
+                replace = true;
+                min_depth = self.values[i].depth;
+            }
+        }
+        if replace{
+            self.values[idx] = entry;
+        }
+    }
+
 }
+
 pub struct TranspositionTable{
     buckets: Vec<Bucket>,
     size: usize,
@@ -51,32 +89,22 @@ pub struct TranspositionTable{
 
 impl TranspositionTable{
     pub fn new(size:usize)->Self{
+        let num_buckets = (size)/ENTRIES_PER_BUCKET;
         Self{
-            buckets: vec![Bucket::new(); size],
+            buckets: vec![Bucket::new(); num_buckets],
             size
         }
     }
 
-    pub fn insert(&mut self,key:ZobristKey,value:TableEntry){
-        let bucket  = key as usize % self.size ;
-        let mut min_depth_index = 0;
-        for i in 1..ENTRIES_PER_BUCKET {
-            if self.buckets[bucket].values[i].node_type != NodeType::None && self.buckets[bucket].values[i].depth < value.depth{
-                min_depth_index = i;
-            }
-        }
-        self.buckets[bucket].values[min_depth_index] = value
-
+    pub fn insert(&mut self,entry:TableEntry){
+        let bucket_idx = (entry.key as usize) % self.buckets.len();
+        self.buckets[bucket_idx].put(entry);
     }
 
-    pub fn get_entry(&mut self,key:ZobristKey)->Option<TableEntry>{
-        let bucket = key as usize % self.size;
-        for i in self.buckets[bucket].values {
-            if i.key == key{
-                return Some(i)
-            }
-        }
-        None
+    pub fn lookup(&mut self,key:ZobristKey)->Option<&TableEntry>{
+        let bucket_idx = key as usize % self.buckets.len();
+        self.buckets[bucket_idx].get(key)
     }
+
 }
 

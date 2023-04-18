@@ -4,3 +4,4 @@ pub mod evaluation;
 pub mod bitboard;
 pub mod utils;
 pub mod transposition;
+pub mod stats;
