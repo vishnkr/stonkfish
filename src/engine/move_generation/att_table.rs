@@ -6,7 +6,7 @@ use crate::engine::{
     utils::get_rank_attacks,
 };
 
-#[derive(PartialEq,Eq,Hash,Copy,Clone)]
+#[derive(Debug,PartialEq,Eq,Hash,Copy,Clone)]
 pub enum SlideDirection{
     North,
     South,
@@ -19,13 +19,13 @@ pub enum SlideDirection{
 }
 
 pub struct AttackTable{
-    knight_attacks: ArrayVec::<Bitboard,256>,
-    king_attacks:ArrayVec::<Bitboard,256>,
-    pawn_attacks:[ArrayVec::<Bitboard,256>;2],
-    slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
-    occupancy_lookup: Vec<Vec<u16>>,
-    files: Vec<Bitboard>,
-    ranks: Vec<Bitboard>,
+    pub knight_attacks: ArrayVec::<Bitboard,256>,
+    pub king_attacks:ArrayVec::<Bitboard,256>,
+    pub pawn_attacks:[ArrayVec::<Bitboard,256>;2],
+    pub slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
+    pub occupancy_lookup: Vec<Vec<u16>>,
+    pub files: Vec<Bitboard>,
+    pub ranks: Vec<Bitboard>,
     pub diagonals: HashMap<i8,Bitboard>,
     pub anti_diagonals: HashMap<i8,Bitboard>, 
     pub main_diagonal: Bitboard,
@@ -168,6 +168,7 @@ impl AttackTable{
     pub fn get_pawn_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
         let row = to_row(position);
         let next_rank_bb = match color {
+            // bug causing subtraction overflow for depth>5, check pawn is only at rank 2-7 before calling this method?
             Color::WHITE => self.get_rank(position-16),
             Color::BLACK => self.get_rank(position+16)
         };

@@ -1,17 +1,19 @@
 use core::fmt;
+use std::collections::HashMap;
+use std::convert::TryInto;
 use std::ops::Not;
 
-use crate::engine::bitboard::{Bitboard,to_pos,display_bitboard, to_row, to_col};
+use crate::engine::bitboard::{Bitboard,to_pos,to_row,to_col};
 use crate::engine::move_generation::moves::*;
 
 use self::zobrist::Zobrist;
-
-use super::bitboard::display_bitboard_with_board_desc;
+use super::evaluation::SlideDirection;
 
 pub mod zobrist;
 
+type JumpOffsets = (i16,i16);
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy,Clone, PartialEq, Eq, Hash)]
 pub enum PieceType{
     Pawn,
 	Knight,
@@ -19,8 +21,16 @@ pub enum PieceType{
 	Rook,
 	Queen,
 	King,
-    Custom,
+    Custom
 }
+
+#[derive(Debug,Clone, PartialEq, Eq, Hash)]
+pub struct MovePattern{
+    jump_moves: Vec<JumpOffsets>,
+    slide_dirs: Vec<SlideDirection>,
+}
+
+
 impl PieceType{
     pub fn to_string(&self)->String{
         format!("{:?}",self)
@@ -66,11 +76,14 @@ pub struct Piece{
     pub piece_type:PieceType,
     pub bitboard: Bitboard,
     pub piece_repr: char,
-    pub player:u8
+    pub player:u8,
+    // move_patterns set only for custom pieces
+    pub move_patterns: Option<MovePattern>
 }
+
 impl Piece{
     pub fn new_piece(player:u8, repr:char) -> Self{
-        let mut piece:Piece = Piece{bitboard:Bitboard::zero(),player:0,piece_repr:repr,piece_type:PieceType::Custom};
+        let mut piece:Piece = Piece{bitboard:Bitboard::zero(),player,piece_repr:repr,piece_type:PieceType::Pawn, move_patterns:None};
         match repr{
             'p'=> piece.piece_type = PieceType::Pawn,
             'r'=> piece.piece_type = PieceType::Rook,
@@ -95,8 +108,7 @@ pub struct PieceSet{
     pub knight:Piece,
     pub pawn:Piece,
     pub occupied: Bitboard,
-    //custom:Vec<Piece>
-    
+    pub custom: HashMap<char,Piece>
 }
 
 impl PieceSet{
@@ -110,6 +122,7 @@ impl PieceSet{
             knight: Piece::new_piece(player,'n'),
             pawn: Piece::new_piece(player,'p'),
             occupied: Bitboard::zero(),
+            custom: HashMap::new()
         }
     }
     pub fn as_array(&self) -> [&Piece; 6] {
@@ -117,20 +130,28 @@ impl PieceSet{
     }
     pub fn get_piece_from_sq(&mut self,loc:usize)->Option<&mut Piece>{
         if self.pawn.bitboard.bit(loc).unwrap(){
-            Some(&mut self.pawn)
+            return Some(&mut self.pawn);
         } else if self.bishop.bitboard.bit(loc).unwrap(){
-            Some(&mut self.bishop)
+            return Some(&mut self.bishop);
         } else if self.rook.bitboard.bit(loc).unwrap(){
-            Some(&mut self.rook)
+            return Some(&mut self.rook);
         } else if self.king.bitboard.bit(loc).unwrap(){
-            Some(&mut self.king)
+            return Some(&mut self.king);
         } else if self.queen.bitboard.bit(loc).unwrap(){
-            Some(&mut self.queen)
+            return Some(&mut self.queen);
         } else if self.knight.bitboard.bit(loc).unwrap(){
-            Some(&mut self.knight)
-        }  else{
-            None
+            return Some(&mut self.knight);
+        }  
+        self.get_custom_piece_from_sq(loc)
+    }
+
+    pub fn get_custom_piece_from_sq(&mut self, index:usize)->Option<&mut Piece>{
+        for (_,piece) in self.custom.iter_mut(){
+            if piece.bitboard.bit(index).unwrap(){
+                return Some(piece);
+            }
         }
+        None
     }
 
     pub fn get_piece_from_piecetype(&mut self,piece_type:PieceType)->Option<&mut Piece>{
@@ -150,9 +171,9 @@ impl PieceSet{
 pub struct Position{
     pub turn: Color,
     pub dimensions:Dimensions,
-    //ind-0: white set, ind-1: black set
+    ///idx -0: white set, idx-1: black set
     pub pieces: Vec<PieceSet>,
-    // castling right is encoded as follows - white kingside (2 bits) | white queenside (2 bits) | black kingside (2 bits) | black queenside (2 bits)
+    /// castling right is encoded as follows - white kingside (2 bits) | white queenside (2 bits) | black kingside (2 bits) | black queenside (2 bits)
     pub castling_rights: u8,
     pub has_king_moved: bool,
     pub recent_capture: Option<(PieceType,char)>,
@@ -176,6 +197,14 @@ impl PartialEq for Position {
 pub struct Dimensions{
     pub height: u8,
     pub width: u8
+}
+
+impl Dimensions{
+    pub fn is_pos_in_range(&self, pos:usize)->bool{
+        let row = to_row(pos.try_into().unwrap());
+        let col = to_col(pos.try_into().unwrap());
+        col>=0 && col<=self.width && row>=0 && row<=self.height
+    }
 }
 
 const RADIX: u32 = 10;

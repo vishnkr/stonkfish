@@ -7,19 +7,23 @@ use crate::engine::{
 };
 use std::vec::Vec;
 use self::att_table::AttackTable;
-
+use crate::AdditionalInfo::PromoPieceType;
 
 pub mod moves;
 pub mod att_table;
 
 pub struct MoveGenerator{
     attack_table: AttackTable,
+    dimensions: Dimensions
 }
 
 
 impl MoveGenerator{
     pub fn new(dimensions:Dimensions)->Self{
-        Self{attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height})}
+        Self{
+            attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height}),
+            dimensions
+        }
     }
 
     pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
@@ -28,16 +32,22 @@ impl MoveGenerator{
         let opponent_bb =  &cur_position.position_bitboard & !&cur_position.pieces[color as usize].occupied;
         let player_bb = &cur_position.pieces[color as usize].occupied;
         let occupancy = &cur_position.position_bitboard;
+
+
         let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|{
             while !piece_bitboard.is_zero(){
                 let mut pos = piece_bitboard.lowest_one().unwrap_or(0) as u8;
-                let mut attack_bb = match piece_type{
+                let mut attack_bb:Bitboard = match piece_type{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
                     PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
                     PieceType::Rook => self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Queen => self.attack_table.get_bishop_attacks(pos,&occupancy) | self.attack_table.get_rook_attacks(pos,&occupancy),
                     PieceType::Knight => self.attack_table.get_knight_attacks(pos),
-                    PieceType::Pawn => self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,&opponent_bb),
+                    PieceType::Pawn => {
+                        if(!self.is_promotion_push(pos,color)){
+                            self.attack_table.get_pawn_attacks_and_pushes(pos,cur_position.turn,&cur_position.dimensions,player_bb,&opponent_bb)
+                        } else{ Bitboard::zero() }
+                    },
                     _ => self.attack_table.get_knight_attacks(pos),
                 };
                 
@@ -63,7 +73,47 @@ impl MoveGenerator{
             gen_piece_moves_bb(piece.piece_type,(&piece.bitboard).to_owned());
         }
 
-        let mut moves:Vec<Move> = vec![];
+        let mut non_quiet_moves:Vec<Move> = vec![];
+
+        let mut pawn_bb_rank = cur_position.pieces[color as usize].pawn.bitboard.clone();
+        // preserve only rank before promotion
+        pawn_bb_rank &= match color {
+                Color::BLACK => &self.attack_table.ranks[(self.dimensions.height-1) as usize],
+                Color::WHITE=> &self.attack_table.ranks[1]
+        };
+        let possible_promos = [PieceType::Bishop,PieceType::Knight,PieceType::Rook,PieceType::Queen];
+        while !pawn_bb_rank.is_zero(){
+            let pos = pawn_bb_rank.lowest_one().unwrap();
+            let row = to_row(pos as u8);
+            let col = to_col(pos as u8);
+            let targets : (usize,usize,usize);
+            match color{
+                Color::BLACK => {
+                    if row!=self.dimensions.height-1 { continue }
+                    targets = (to_pos(0,col-1),to_pos(0,col) ,to_pos(0,col+1));
+                }
+                Color::WHITE=> {
+                    if row!=1 { continue }
+                    targets  = (pos+15,pos+16,pos+17);
+                }
+            }
+            for piece in possible_promos{
+                if !opponent_bb.bit(targets.1).unwrap() && !occupancy.bit(targets.1).unwrap(){
+                    non_quiet_moves.push(Move::encode_move(pos as u8,targets.1 as u8,MType::Promote,Some(PromoPieceType(piece))));
+                }
+                if self.dimensions.is_pos_in_range(targets.0) 
+                   && opponent_bb.bit(targets.0).unwrap_or(false) 
+                   && !cur_position.pieces[(!color) as usize].king.bitboard.bit(targets.0).unwrap_or(true){
+                    non_quiet_moves.push(Move::encode_move(pos as u8,targets.0 as u8,MType::Promote,Some(PromoPieceType(piece))));
+                }
+                if self.dimensions.is_pos_in_range(targets.2)  && opponent_bb.bit(targets.2).unwrap_or(false) && !cur_position.pieces[!color as usize].king.bitboard.bit(targets.2).unwrap_or(true){
+                    non_quiet_moves.push(Move::encode_move(pos as u8,targets.2 as u8,MType::Promote,Some(PromoPieceType(piece))));
+                }
+            }
+            pawn_bb_rank.set_bit(pos.into(), false);
+        }
+
+
         let king_pos = cur_position.pieces[color as usize].king.bitboard.lowest_one().unwrap() as u8;
         if cur_position.valid_kingside_castle(){
             // is rook in position, is path blocked and will king move into check after 1 move
@@ -78,13 +128,13 @@ impl MoveGenerator{
                     if rank_attack.is_zero(){
                         let skipped_mv = Move::encode_move(king_pos, dest, MType::Quiet,None);
                         if self.is_legal_move(cur_position, &skipped_mv){
-                            moves.push(Move::encode_move(king_pos, king_pos+2, MType::KingsideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
+                            non_quiet_moves.push(Move::encode_move(king_pos, king_pos+2, MType::KingsideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
                         }
                     }
                 }
-                
             }
         }
+
         if cur_position.valid_queenside_castle(){
             let target_rank = to_row(king_pos as u8);
             let target_rook_pos = 16*target_rank;
@@ -97,13 +147,13 @@ impl MoveGenerator{
                     if rank_attack.is_zero(){
                         let skipped_mv = Move::encode_move(king_pos, dest, MType::Quiet,None);
                         if self.is_legal_move(cur_position, &skipped_mv){
-                            moves.push(Move::encode_move(king_pos, king_pos-2, MType::QueensideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
+                            non_quiet_moves.push(Move::encode_move(king_pos, king_pos-2, MType::QueensideCastle,Some(AdditionalInfo::CastlingRookPos(target_rook_pos))));
                         }
                     }
                 }
             }
         }
-        
+
         move_masks.into_iter().flatten()
         
     }
@@ -118,6 +168,13 @@ impl MoveGenerator{
         }
         position.unmake_move(mv);
         !is_under_check
+    }
+
+    pub fn is_promotion_push(&self,index:u8,color:Color)->bool{
+        match color{
+            Color::BLACK => to_row(index) == 1,
+            Color::WHITE => to_row(index) == self.dimensions.height-1
+        }
     }
 
     pub fn is_king_under_check(&self,position:&mut Position)-> bool{

@@ -19,7 +19,7 @@ pub enum MType{
 }
 
 pub enum AdditionalInfo {
-    PromoPieceType(char),
+    PromoPieceType(PieceType),
     CastlingRookPos(u8)
 }
 
