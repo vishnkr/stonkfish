@@ -62,22 +62,13 @@ impl Bucket{
     /// Go through the entries in the bucket and find an empty slot or a slot with a matching key
     pub fn put(&mut self,entry:TableEntry){
         let mut idx = 0;
-        let mut replace = true;
-        let mut min_depth = self.values[0].depth;
-        for i in 0..ENTRIES_PER_BUCKET{
-            if self.values[i].key == entry.key{
-                idx= i;
-                replace = true;
+        while idx < ENTRIES_PER_BUCKET{
+            if self.values[idx].node_type == NodeType::None ||self.values[idx].key == entry.key || entry.depth < self.values[idx].depth  {
                 break;
-            } else if self.values[i].depth <min_depth{
-                idx = i;
-                replace = true;
-                min_depth = self.values[i].depth;
             }
+            idx+=1;
         }
-        if replace{
-            self.values[idx] = entry;
-        }
+        self.values[idx] = entry;
     }
 
 }
