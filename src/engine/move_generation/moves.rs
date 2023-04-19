@@ -1,6 +1,6 @@
 
 use std::{fmt::{self, write}};
-use crate::engine::{bitboard::*, position::PieceType};
+use crate::engine::{bitboard::*, position::{piece::PieceType}};
 
 #[derive(PartialEq,Copy,Clone)]
 pub struct Move(u32);
@@ -154,6 +154,6 @@ impl fmt::Display for Move{
         let src_pos = self.get_src_square();
         let src_coords = (to_row(src_pos as u8),to_col(src_pos as u8));
         let dest_coords = (to_row(dest_pos as u8),to_col(dest_pos as u8));
-        write!(f," {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,sq_to_notation(src_pos),src_coords.0,src_coords.1,sq_to_notation(dest_pos),dest_coords.0,dest_coords.1)
+        write!(f," {} from {} (row-{}, col-{}) to {} (row-{}, col-{})",mtype,src_pos,src_coords.0,src_coords.1,dest_pos,dest_coords.0,dest_coords.1)
     }
 }

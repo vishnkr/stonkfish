@@ -6,23 +6,14 @@ use std::ops::Not;
 use crate::engine::bitboard::{Bitboard,to_pos,to_row,to_col};
 use crate::engine::move_generation::moves::*;
 
+use self::piece::{PieceSet, Piece,PieceType};
 use self::zobrist::Zobrist;
 use super::evaluation::SlideDirection;
 
 pub mod zobrist;
+pub mod piece;
 
 type JumpOffsets = (i16,i16);
-
-#[derive(Copy,Clone, PartialEq, Eq, Hash)]
-pub enum PieceType{
-    Pawn,
-	Knight,
-	Bishop,
-	Rook,
-	Queen,
-	King,
-    Custom
-}
 
 #[derive(Debug,Clone, PartialEq, Eq, Hash)]
 pub struct MovePattern{
@@ -66,103 +57,6 @@ impl Not for Color {
         match self {
             Color::BLACK => Color::WHITE,
             Color::WHITE => Color::BLACK
-        }
-    }
-}
-
-
-#[derive(Debug,PartialEq)]
-pub struct Piece{
-    pub piece_type:PieceType,
-    pub bitboard: Bitboard,
-    pub piece_repr: char,
-    pub player:u8,
-    // move_patterns set only for custom pieces
-    pub move_patterns: Option<MovePattern>
-}
-
-impl Piece{
-    pub fn new_piece(player:u8, repr:char) -> Self{
-        let mut piece:Piece = Piece{bitboard:Bitboard::zero(),player,piece_repr:repr,piece_type:PieceType::Pawn, move_patterns:None};
-        match repr{
-            'p'=> piece.piece_type = PieceType::Pawn,
-            'r'=> piece.piece_type = PieceType::Rook,
-            'k'=> piece.piece_type = PieceType::King,
-            'q'=> piece.piece_type = PieceType::Queen,
-            'b'=> piece.piece_type = PieceType::Bishop,
-            'n'=> piece.piece_type = PieceType::Knight,
-            _=> piece.piece_type = PieceType::Custom,
-        }
-        piece
-    }
-}
-
-
-#[derive(Debug,PartialEq)]
-pub struct PieceSet{
-    pub player:u8,
-    pub king:Piece,
-    pub queen:Piece,
-    pub rook:Piece,
-    pub bishop:Piece,
-    pub knight:Piece,
-    pub pawn:Piece,
-    pub occupied: Bitboard,
-    pub custom: HashMap<char,Piece>
-}
-
-impl PieceSet{
-    pub fn new(player:u8)->Self{
-        PieceSet{
-            player:player,
-            king: Piece::new_piece(player,'k'),
-            queen: Piece::new_piece(player,'q'),
-            rook: Piece::new_piece(player,'r'),
-            bishop: Piece::new_piece(player,'b'),
-            knight: Piece::new_piece(player,'n'),
-            pawn: Piece::new_piece(player,'p'),
-            occupied: Bitboard::zero(),
-            custom: HashMap::new()
-        }
-    }
-    pub fn as_array(&self) -> [&Piece; 6] {
-        return [&self.king, &self.pawn, &self.bishop,&self.queen,&self.rook,&self.knight]
-    }
-    pub fn get_piece_from_sq(&mut self,loc:usize)->Option<&mut Piece>{
-        if self.pawn.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.pawn);
-        } else if self.bishop.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.bishop);
-        } else if self.rook.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.rook);
-        } else if self.king.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.king);
-        } else if self.queen.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.queen);
-        } else if self.knight.bitboard.bit(loc).unwrap(){
-            return Some(&mut self.knight);
-        }  
-        self.get_custom_piece_from_sq(loc)
-    }
-
-    pub fn get_custom_piece_from_sq(&mut self, index:usize)->Option<&mut Piece>{
-        for (_,piece) in self.custom.iter_mut(){
-            if piece.bitboard.bit(index).unwrap(){
-                return Some(piece);
-            }
-        }
-        None
-    }
-
-    pub fn get_piece_from_piecetype(&mut self,piece_type:PieceType)->Option<&mut Piece>{
-        match piece_type{
-            PieceType::Bishop=> Some(&mut self.bishop),
-            PieceType::Knight=> Some(&mut self.knight),
-            PieceType::King=> Some(&mut self.king),
-            PieceType::Queen=> Some(&mut self.queen),
-            PieceType::Pawn=> Some(&mut self.pawn),
-            PieceType::Custom=> None,
-            PieceType::Rook=> Some(&mut self.rook),
         }
     }
 }
@@ -321,7 +215,7 @@ impl Position{
         let dest:usize = mv.get_dest_square() as usize;
         let mtype = mv.get_mtype().unwrap();
         let opponent_color =!self.turn;
-        //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
+        //let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(src).unwrap();
         match mtype{
             MType::Quiet =>{
                 self.move_piece(self.turn, (src,dest));
@@ -335,7 +229,7 @@ impl Position{
             },
             MType::Capture =>{
                 
-                let captured_piece = self.pieces[opponent_color as usize].get_piece_from_sq(dest).unwrap();
+                let captured_piece = self.pieces[opponent_color as usize].get_mut_piece_from_sq(dest).unwrap();
                 self.recent_capture = Some((captured_piece.piece_type,captured_piece.piece_repr));
                 self.remove_piece(opponent_color,dest);
                 self.move_piece(self.turn,(src,dest));
@@ -350,7 +244,7 @@ impl Position{
     }
 
     pub fn remove_piece(&mut self,color:Color,sq:usize){
-        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(sq).unwrap();
+        let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(sq).unwrap();
         self.position_bitboard.set_bit(sq,false);
         piece.bitboard.set_bit(sq,false);
     }
@@ -375,7 +269,7 @@ impl Position{
     pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
         let src = from_to.0;
         let dest = from_to.1;
-        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(src).unwrap();
+        let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(src).unwrap();
         self.position_bitboard.set_bit(src,false);
         self.position_bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(dest,true);
@@ -386,7 +280,7 @@ impl Position{
         let src:usize = mv.get_src_square() as usize;
         let dest:usize = mv.get_dest_square() as usize;
         let mtype = mv.get_mtype().unwrap_or(MType::Quiet);
-        //let piece:&mut Piece = self.pieces[color as usize].get_piece_from_sq(dest).unwrap();
+        //let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(dest).unwrap();
         self.switch_turn();
         match mtype{
             MType::Quiet =>{
@@ -399,7 +293,7 @@ impl Position{
                 let opponent_color:Color = Position::get_opponent_color(self.turn);
                 let captured_piece = self.recent_capture;
                 self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
-                let piece:&mut Piece = self.pieces[self.turn as usize].get_piece_from_sq(dest).unwrap();
+                let piece:&mut Piece = self.pieces[self.turn as usize].get_mut_piece_from_sq(dest).unwrap();
                 self.position_bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(dest,false);

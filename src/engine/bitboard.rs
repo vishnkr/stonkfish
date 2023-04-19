@@ -1,8 +1,11 @@
 use numext_fixed_uint::U256;
 
+use super::position::Dimensions;
+
 pub type Bitboard = U256;
 
 pub fn to_pos(x:u8,y:u8) -> usize{
+    //println!("x {} y {}",x,y);
     ((x*16)+y).into()
 }
 
@@ -15,14 +18,14 @@ pub fn to_row(pos:u8)->u8{
 }
 
 
-pub fn rowcol_to_notation(row:u8,col:u8)->String{ 
-    let row_char = (b'1' + row) as char;
+pub fn sq_to_notation(pos:u8,rows:u8)->String{
+    let (row,col) = (to_row(pos),to_col(pos));
+    /* Since bitboard is in little endian, LSB is a8 equivalent(black's lower left)
+        So first rank in the bitboard is black's -> notation wise first rank is white's
+     */
+    let row_char = (rows-row); 
     let col_char = (b'a' + col) as char;
     format!("{}{}", col_char, row_char)
- }
-
-pub fn sq_to_notation(pos:u8)->String{
-    return rowcol_to_notation(to_row(pos),to_col(pos))
 }
 
 pub fn display_bitboard(bitboard:&Bitboard)->String{

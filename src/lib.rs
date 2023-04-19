@@ -1,12 +1,14 @@
 
-mod engine;
+pub mod engine;
 use engine::{
     move_generation::{MoveGenerator,moves::*, generate_legal_moves},
-    evaluation::Evaluator,
-    position::Position,
+    evaluation::{Evaluator, PieceType},
+    position::{Position,Color},
     transposition::*,
-    stats::*
+    stats::*, bitboard::sq_to_notation
     };
+
+use crate::engine::move_generation::moves;
 
 pub struct Engine{
     pub move_generator: MoveGenerator,
@@ -98,21 +100,48 @@ impl Engine{
         
     }
 
-    pub fn perft(&mut self,depth: u32)->u64{
+    pub fn perft(&mut self,depth: u32,current_depth:u32)->u64{
         if (depth==0){
             return 1;
         }
         let mut nodes = 0;
-        let moves = generate_legal_moves(&self.move_generator, &mut self.position); //engine.move_generator.generate_pseudolegal_moves(&mut engine.position);
+        let mut moves_per_depth = vec![0; depth as usize + 1];
+        let moves = time_it!("Legal move generation",{ generate_legal_moves(&self.move_generator, &mut self.position) });
+        self.stats.move_gen_stats.moves_generated += moves.len();
+        println!("{}({})","---|".repeat(current_depth as usize),current_depth);
         for mv in moves{
             self.stats.move_gen_stats.update_move_type_count(&mv);
+            println!("{} - depth {}",self.to_algebraic_notation(&mv, self.position.turn),depth);
             self.position.make_move(&mv);
-            let count = self.perft(depth-1);
+            let count = self.perft(depth-1,current_depth+1);
+            *self.stats.move_gen_stats.moves_per_depth.entry(current_depth).or_insert(0) += 1;
             nodes+=count;
-            //println!("Depth {}, Move {}, Count {}", depth, mv, count);
             self.position.unmake_move(&mv);
         }
-        
+        println!("{}({})","---|".repeat(current_depth as usize),current_depth);
         return nodes
+    }
+    pub fn to_algebraic_notation(&self,mv:&Move,color:Color)->String{
+        let (src,dest,mtype) = (mv.get_src_square(), mv.get_dest_square(),mv.get_mtype().unwrap());
+        let piece = self.position.pieces[color as usize].get_piece_from_sq(src.into()).unwrap();
+        let rows = self.move_generator.dimensions.height;
+        if piece.piece_type == PieceType::Pawn{
+            return format!("{}{}",
+            sq_to_notation(src,rows)
+            ,sq_to_notation(dest,rows));
+        } else {
+            let mut piece_type_str = piece.piece_repr.to_string();
+            if color == Color::WHITE{ piece_type_str = piece_type_str.to_ascii_uppercase()}
+            match mtype{
+                MType::Quiet=>{ format!("{}{}{}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows)) },
+                MType::KingsideCastle => "O-O".to_string(),
+                MType::QueensideCastle => "O-O-O".to_string(),
+                MType::Capture=>{format!("{}{}x{}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                //capture promos will be formated as promo for now
+                MType::Promote =>{format!("{}{}={}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                _=> "".to_string()
+            }
+        }
+
     }
 }

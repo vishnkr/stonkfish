@@ -1,3 +1,5 @@
+use std::{collections::HashMap, hash::Hash};
+
 use super::move_generation::moves::{Move, MType};
 
 
@@ -17,7 +19,8 @@ impl Stats{
                 ep_count: 0,
                 capture_count:0,
                 promo_count: 0,
-                castle_count: 0
+                castle_count: 0,
+                moves_per_depth: HashMap::new()
             }
         }
     }
@@ -27,13 +30,14 @@ pub struct SearchStats{
 }
 
 pub struct MoveGenStats{
-    pub moves_generated : u64,
+    pub moves_generated: usize,
     pub depth: u8,
     pub quiet_count: u64,
     pub ep_count: u64,
     pub capture_count:u64,
     pub promo_count: u64,
-    pub castle_count: u64
+    pub castle_count: u64,
+    pub moves_per_depth: HashMap<u32,u64>
 }
 
 impl MoveGenStats{
@@ -46,17 +50,22 @@ impl MoveGenStats{
         println!("Castle Moves: {}", self.castle_count);
         println!("En Passant Moves: {}", self.ep_count);
         println!("Promotion Moves: {}", self.promo_count);
+        println!("Moves per Depth:");
+        let mut moves:Vec<&u32> = self.moves_per_depth.keys().collect();
+        moves.sort();
+        for (depth) in moves {
+            println!("Depth {}: {}", depth, self.moves_per_depth.get(depth).unwrap());
+        }
     }
 
     pub fn update_move_type_count(&mut self,mv:&Move){
-        self.moves_generated+=1;
-        match mv.get_mtype() {
+        match mv.get_mtype() { 
             Some(MType::Quiet) => self.quiet_count+=1,
             Some(MType::Capture) => self.capture_count+=1,
             Some(MType::KingsideCastle) | Some(MType::QueensideCastle) => self.castle_count+=1,
             Some(MType::EnPassant) => self.ep_count+=1,
             Some(MType::Promote) => self.promo_count+=1,
-            _ => self.moves_generated-=1
+            _ => {}
         }
     }
 }

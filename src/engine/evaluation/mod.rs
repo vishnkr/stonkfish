@@ -2,7 +2,7 @@ mod piece_sq;
 
 use std::collections::HashMap;
 use arrayvec::ArrayVec;
-pub use crate::engine::position::{Position,PieceSet,PieceType};
+pub use crate::engine::position::{Position,piece::PieceSet,piece::PieceType};
 pub use crate::engine::move_generation::att_table::SlideDirection;
 
 use self::piece_sq::PieceSquareTables;

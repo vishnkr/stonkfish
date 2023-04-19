@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use crate::engine::{bitboard::{to_pos, to_row, to_col},position::*};
+use crate::engine::{bitboard::{to_pos, to_row, to_col},position::{*, piece::PieceType}};
 use std::iter::repeat;
 
 type PieceSquareTable = ArrayVec<i8,256>;

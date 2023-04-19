@@ -5,16 +5,18 @@ use crate::engine::{
     position::*,
     utils::get_rank_attacks,
 };
-use std::vec::Vec;
+use std::vec::{Vec, self};
 use self::att_table::AttackTable;
 use crate::AdditionalInfo::PromoPieceType;
+
+use super::position::piece::PieceType;
 
 pub mod moves;
 pub mod att_table;
 
 pub struct MoveGenerator{
     attack_table: AttackTable,
-    dimensions: Dimensions
+    pub dimensions: Dimensions
 }
 
 
@@ -32,9 +34,10 @@ impl MoveGenerator{
         let opponent_bb =  &cur_position.position_bitboard & !&cur_position.pieces[color as usize].occupied;
         let player_bb = &cur_position.pieces[color as usize].occupied;
         let occupancy = &cur_position.position_bitboard;
-
-
-        let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|{
+        let king_pos = cur_position.pieces[color as usize].king.bitboard.lowest_one().unwrap() as u8;
+        let opp_king_pos = cur_position.pieces[!color as usize].king.bitboard.lowest_one().unwrap();
+        let mut moves = vec![];
+        let mut gen_piece_moves_bb = |piece_type:PieceType,mut piece_bitboard:Bitboard|->(){
             while !piece_bitboard.is_zero(){
                 let mut pos = piece_bitboard.lowest_one().unwrap_or(0) as u8;
                 let mut attack_bb:Bitboard = match piece_type{
@@ -52,17 +55,22 @@ impl MoveGenerator{
                 };
                 
                 attack_bb &= !player_bb;
-                
+                attack_bb.set_bit(opp_king_pos, false);
                 piece_bitboard.set_bit(pos.into(),false);
                 attack_bb.set_bit(pos.into(),false);
                 attack_bb &= &self.attack_table.full_bitboard;
-                move_masks.push(
-                    MoveMask{
-                    bitboard:attack_bb,
-                    src:pos.into(),
-                    piece_type,
-                    opponent: opponent_bb.to_owned()
-                });
+                while !attack_bb.is_zero(){
+                    let dest_pos = match attack_bb.lowest_one(){
+                        Some(x) => x,
+                        None=> {panic!("invalid attack pos");}
+                    };
+                    attack_bb.set_bit(dest_pos,false);
+                    let mut mtype = MType::Quiet;
+                    if opponent_bb.bit(dest_pos).unwrap(){
+                        mtype = MType::Capture;
+                    }
+                    moves.push(Move::encode_move(pos, dest_pos as u8, mtype, None));
+                }
             }
             
         };
@@ -114,12 +122,12 @@ impl MoveGenerator{
         }
 
 
-        let king_pos = cur_position.pieces[color as usize].king.bitboard.lowest_one().unwrap() as u8;
+        
         if cur_position.valid_kingside_castle(){
             // is rook in position, is path blocked and will king move into check after 1 move
             let target_rank = to_row(king_pos as u8);
             let target_rook_pos = (16*target_rank+1)-1;
-            if let Some(ref piece) = cur_position.pieces[color as usize].get_piece_from_sq(target_rook_pos.into()){
+            if let Some(ref piece) = cur_position.pieces[color as usize].get_mut_piece_from_sq(target_rook_pos.into()){
                 if piece.piece_type == PieceType::Rook{
                     let mut rank_attack = Bitboard::from(get_rank_attacks(true, king_pos as u16));
                     rank_attack &= &cur_position.position_bitboard;
@@ -138,7 +146,7 @@ impl MoveGenerator{
         if cur_position.valid_queenside_castle(){
             let target_rank = to_row(king_pos as u8);
             let target_rook_pos = 16*target_rank;
-            if let Some(piece) = cur_position.pieces[color as usize].get_piece_from_sq(target_rook_pos.into()){
+            if let Some(piece) = cur_position.pieces[color as usize].get_mut_piece_from_sq(target_rook_pos.into()){
                 if piece.piece_type == PieceType::Rook{
                     let mut rank_attack = Bitboard::from(get_rank_attacks(false, king_pos as u16));
                     rank_attack &= &cur_position.position_bitboard;
@@ -154,7 +162,8 @@ impl MoveGenerator{
             }
         }
 
-        move_masks.into_iter().flatten()
+        //move_masks.into_iter().flatten().into_iter().chain(non_quiet_moves.into_iter())
+        moves.into_iter()
         
     }
 
@@ -172,8 +181,8 @@ impl MoveGenerator{
 
     pub fn is_promotion_push(&self,index:u8,color:Color)->bool{
         match color{
-            Color::BLACK => to_row(index) == 1,
-            Color::WHITE => to_row(index) == self.dimensions.height-1
+            Color::WHITE => to_row(index) == 1,
+            Color::BLACK => to_row(index) == self.dimensions.height-1
         }
     }
 
@@ -186,7 +195,7 @@ impl MoveGenerator{
 
         while !opponent_bb.is_zero(){
                 let mut pos = opponent_bb.lowest_one().unwrap_or(0) as u8;
-                let piece = pieces[opponent_color as usize].get_piece_from_sq(pos.into()).unwrap();
+                let piece = pieces[opponent_color as usize].get_mut_piece_from_sq(pos.into()).unwrap();
                 let mut attack_bb = match piece.piece_type{
                     PieceType::King => self.attack_table.get_king_attacks(pos),
                     PieceType::Bishop => self.attack_table.get_bishop_attacks(pos,&occupancy),
