@@ -1,17 +1,20 @@
 use core::fmt;
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::ops::Not;
 
 use crate::engine::bitboard::{Bitboard,to_pos,to_row,to_col};
 use crate::engine::move_generation::moves::*;
 
-use self::piece::{PieceSet, Piece,PieceType};
+use self::fen::{RADIX, load_from_fen};
+use self::piece::{Piece,PieceType, PieceRepr};
+use self::piece_collection::PieceCollection;
 use self::zobrist::Zobrist;
 use super::evaluation::SlideDirection;
 
 pub mod zobrist;
 pub mod piece;
+pub mod piece_collection;
+pub mod fen;
 
 type JumpOffsets = (i16,i16);
 
@@ -66,7 +69,7 @@ pub struct Position{
     pub turn: Color,
     pub dimensions:Dimensions,
     ///idx -0: white set, idx-1: black set
-    pub pieces: Vec<PieceSet>,
+    pub piece_collections: Vec<PieceCollection>,
     /// castling right is encoded as follows - white kingside (2 bits) | white queenside (2 bits) | black kingside (2 bits) | black queenside (2 bits)
     pub castling_rights: u8,
     pub has_king_moved: bool,
@@ -79,7 +82,7 @@ impl PartialEq for Position {
     fn eq(&self, other: &Self) -> bool {
         self.turn == other.turn &&
         self.dimensions == other.dimensions &&
-        self.pieces == other.pieces &&
+        self.piece_collections == other.piece_collections &&
         self.castling_rights == other.castling_rights &&
         self.has_king_moved == other.has_king_moved &&
         self.position_bitboard == other.position_bitboard
@@ -101,7 +104,6 @@ impl Dimensions{
     }
 }
 
-const RADIX: u32 = 10;
 
 pub fn get_dimensions(fen_first_part:Vec<String>)-> Dimensions{
     let mut col_count = 0;
@@ -124,90 +126,11 @@ pub fn get_dimensions(fen_first_part:Vec<String>)-> Dimensions{
 impl Position{
 
     pub fn new(fen:String)->Position{
-        Position::load_from_fen(fen)
-    }
-    pub fn load_from_fen(fen:String) -> Position{
-        let board_data:String = fen.split(" ").collect();
-        let dimensions:Dimensions = get_dimensions(board_data.split("/").map(|s| s.to_string()).collect());
-        let mut white_piece_set:PieceSet = PieceSet::new(Color::WHITE as u8);
-        let mut black_piece_set:PieceSet = PieceSet::new(Color::BLACK as u8);
-        let mut turn = Color::WHITE;
-        let mut fen_part = 0;
-        let mut sec_digit = 0;
-        let mut col = 0;
-        let mut row = 0;
-        let mut count;
-        let mut castling_rights:u8 = 0;
-        for (i,c) in fen.chars().enumerate(){
-            if c==' '{
-                fen_part+=1;
-            }
-            match fen_part{
-                0=>{
-                    if c=='/'{
-                        col=0;
-                        row+=1;
-                        sec_digit = 0;
-                        continue;
-                    } else if c.is_digit(RADIX){
-                        count = c.to_digit(RADIX).unwrap_or(0);
-                        if i+1<dimensions.width.into() && (fen.as_bytes()[i+1] as char).is_digit(RADIX){
-                            sec_digit = c.to_digit(RADIX).unwrap_or(0);
-                        } else {
-                            col+=(sec_digit*10+count) as u8;
-                            sec_digit=0;
-                        }
-                    } else {
-                        let all_pieces_bb: &mut Bitboard = if c.is_ascii_lowercase(){&mut black_piece_set.occupied} else {&mut white_piece_set.occupied};
-                        let bitboard: &mut Bitboard = match c.to_ascii_lowercase(){
-                            'p'=> if c.is_ascii_lowercase(){&mut black_piece_set.pawn.bitboard} else {&mut white_piece_set.pawn.bitboard}
-                            'k'=> if c.is_ascii_lowercase(){&mut black_piece_set.king.bitboard} else {&mut white_piece_set.king.bitboard}
-                            'b'=> if c.is_ascii_lowercase(){&mut black_piece_set.bishop.bitboard} else {&mut white_piece_set.bishop.bitboard}
-                            'n'=> if c.is_ascii_lowercase(){&mut black_piece_set.knight.bitboard} else {&mut white_piece_set.knight.bitboard}
-                            'r'=> if c.is_ascii_lowercase(){&mut black_piece_set.rook.bitboard} else {&mut white_piece_set.rook.bitboard}
-                            'q'=> if c.is_ascii_lowercase(){&mut black_piece_set.queen.bitboard} else {&mut white_piece_set.queen.bitboard}
-                            _=> continue
-                        };
-                        let pos = to_pos(row,col);
-                        bitboard.set_bit(pos,true);
-                        all_pieces_bb.set_bit(pos,true);
-                        col+=1
-                    }
-                }
-                1=>{
-                    if c=='w' {turn=Color::WHITE;}
-                    else{turn=Color::BLACK;}
-                }
-                2=>{
-                    castling_rights |= match c {
-                        'K'=>  1<<6,
-                        'Q'=> 1<<4,
-                        'k'=> 1<<2,
-                        'q'=> 1,
-                        _ => 0
-                    }
-                }
-                _ => continue,
-            }
-        }
-        let mut pieces = Vec::new();
-        let position_bitboard = Bitboard::zero() | &white_piece_set.occupied | &black_piece_set.occupied;
-        pieces.push(white_piece_set);
-        pieces.push(black_piece_set);
-        Position{
-            dimensions,
-            turn,
-            pieces,
-            castling_rights,
-            recent_capture: None,
-            has_king_moved: false,
-            position_bitboard,
-            zobrist_hash : Zobrist::new()
-        }
+        load_from_fen(fen)
     }
 
     pub fn get_opponent_position_bb(&self,color:Color)-> Bitboard{
-        return &self.position_bitboard & !&self.pieces[color as usize].occupied;
+        return &self.position_bitboard & !&self.piece_collections[color as usize].occupied;
     }
 
     pub fn make_move(&mut self,mv:&Move){
@@ -215,7 +138,7 @@ impl Position{
         let dest:usize = mv.get_dest_square() as usize;
         let mtype = mv.get_mtype().unwrap();
         let opponent_color =!self.turn;
-        //let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(src).unwrap();
+        //let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(src).unwrap();
         match mtype{
             MType::Quiet =>{
                 self.move_piece(self.turn, (src,dest));
@@ -229,7 +152,7 @@ impl Position{
             },
             MType::Capture =>{
                 
-                let captured_piece = self.pieces[opponent_color as usize].get_mut_piece_from_sq(dest).unwrap();
+                let captured_piece = self.piece_collections[opponent_color as usize].get_mut_piece_from_sq(dest).unwrap();
                 self.recent_capture = Some((captured_piece.piece_type,captured_piece.piece_repr));
                 self.remove_piece(opponent_color,dest);
                 self.move_piece(self.turn,(src,dest));
@@ -244,13 +167,13 @@ impl Position{
     }
 
     pub fn remove_piece(&mut self,color:Color,sq:usize){
-        let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(sq).unwrap();
+        let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(sq).unwrap();
         self.position_bitboard.set_bit(sq,false);
         piece.bitboard.set_bit(sq,false);
     }
     
-    pub fn undo_remove_piece(&mut self,color:Color,sq:usize, piece_type:PieceType){
-        let piece:&mut Piece = self.pieces[color as usize].get_piece_from_piecetype(piece_type).unwrap();
+    pub fn undo_remove_piece(&mut self,color:Color,sq:usize, piece_repr:PieceRepr){
+        let piece:&mut Piece = self.piece_collections[color as usize].pieces.get_mut(&piece_repr).unwrap();
         self.position_bitboard.set_bit(sq,true);
         piece.bitboard.set_bit(sq,true);
     }
@@ -259,17 +182,17 @@ impl Position{
         let colors: [Color;2] = [Color::WHITE,Color::BLACK];
         for color in colors{
             let mut new_val = Bitboard::zero();
-            for piece in self.pieces[color as usize].as_array(){
+            for (_,piece) in self.piece_collections[color as usize].pieces.iter(){
                 new_val |= &piece.bitboard;
             }
-            self.pieces[color as usize].occupied = new_val;
+            self.piece_collections[color as usize].occupied = new_val;
         }
     }
 
     pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
         let src = from_to.0;
         let dest = from_to.1;
-        let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(src).unwrap();
+        let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(src).unwrap();
         self.position_bitboard.set_bit(src,false);
         self.position_bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(dest,true);
@@ -280,7 +203,7 @@ impl Position{
         let src:usize = mv.get_src_square() as usize;
         let dest:usize = mv.get_dest_square() as usize;
         let mtype = mv.get_mtype().unwrap_or(MType::Quiet);
-        //let piece:&mut Piece = self.pieces[color as usize].get_mut_piece_from_sq(dest).unwrap();
+        //let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(dest).unwrap();
         self.switch_turn();
         match mtype{
             MType::Quiet =>{
@@ -293,7 +216,7 @@ impl Position{
                 let opponent_color:Color = Position::get_opponent_color(self.turn);
                 let captured_piece = self.recent_capture;
                 self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
-                let piece:&mut Piece = self.pieces[self.turn as usize].get_mut_piece_from_sq(dest).unwrap();
+                let piece:&mut Piece = self.piece_collections[self.turn as usize].get_mut_piece_from_sq(dest).unwrap();
                 self.position_bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(dest,false);
@@ -315,8 +238,8 @@ impl Position{
 
     pub fn get_zobrist_hash(&self)-> u64{
         let mut zobrist_hash_key = 0u64;
-        for (i,piece_set) in self.pieces.iter().enumerate(){
-            for piece in piece_set.as_array(){
+        for (i,collection) in self.piece_collections.iter().enumerate(){
+            for piece in collection.as_array(){
                 let mut bitboard = piece.bitboard.to_owned();
                 while !bitboard.is_zero(){
                     let pos = bitboard.lowest_one().unwrap_or(0);

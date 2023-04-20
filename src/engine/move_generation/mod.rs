@@ -1,34 +1,77 @@
 use moves::*;
-
 use crate::engine::{
     bitboard::*,
     position::*,
     utils::get_rank_attacks,
 };
-use std::vec::{Vec, self};
+use std::vec::{Vec};
 use self::att_table::AttackTable;
 use crate::AdditionalInfo::PromoPieceType;
-
+use lazy_static::lazy_static;
 use super::position::piece::PieceType;
 
 pub mod moves;
 pub mod att_table;
 
+
+lazy_static! {
+    static ref LAZY_ATTACK_TABLE: AttackTable = AttackTable::new();
+}
+
+pub struct SizeDependentBitboards{
+    pub full_bitboard:Bitboard,
+    pub row_boundary:Bitboard,
+    pub col_boundary:Bitboard
+}
+
+impl SizeDependentBitboards{
+    pub fn new(dimensions:&Dimensions)->Self{
+        let mut full_bitboard = Bitboard::zero();
+        let mut row_boundary = Bitboard::zero();
+        let mut col_boundary = Bitboard::zero();
+        for i in 0..dimensions.height{
+            for j in 0..dimensions.width{
+                full_bitboard.set_bit(to_pos(i,j),true);
+                if i==0||i==dimensions.height-1{
+                    row_boundary.set_bit(to_pos(i,j), true);
+                }
+                if j==0||i==dimensions.width-1{
+                    row_boundary.set_bit(to_pos(i,j), true);
+                }
+            }
+        }
+        SizeDependentBitboards { full_bitboard, row_boundary , col_boundary}
+    }
+}
+
 pub struct MoveGenerator{
-    attack_table: AttackTable,
-    pub dimensions: Dimensions
+    pub attack_table: &'static AttackTable,
+    pub dimensions: Dimensions,
+    pub size_depenedent_bitboards:SizeDependentBitboards
 }
 
 
 impl MoveGenerator{
     pub fn new(dimensions:Dimensions)->Self{
         Self{
-            attack_table : AttackTable::new(Dimensions{width:dimensions.width,height:dimensions.height}),
-            dimensions
+            attack_table: &LAZY_ATTACK_TABLE,
+            dimensions,
+            size_depenedent_bitboards: SizeDependentBitboards::new(&dimensions)
         }
     }
 
-    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
+    pub fn generate_pseudo_legal_moves(&self,cur_position:&mut Position)->impl Iterator<Item=Move>{
+        let piece_collection = &cur_position.pieces[cur_position.turn as usize];
+        let moves = vec![];
+        let color = cur_position.turn;
+        let opponent_bb = &cur_position.pieces[!color as usize].occupied;
+        for piece in piece_collection{
+            generate_
+        }
+        moves.into_iter()
+    }
+
+    pub fn generate_pseudolegal_moves2(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
         let mut move_masks :Vec<MoveMask> = Vec::new();
         let color = cur_position.turn;
         let opponent_bb =  &cur_position.position_bitboard & !&cur_position.pieces[color as usize].occupied;
@@ -163,7 +206,7 @@ impl MoveGenerator{
         }
 
         //move_masks.into_iter().flatten().into_iter().chain(non_quiet_moves.into_iter())
-        moves.into_iter()
+        moves.into_iter().chain(non_quiet_moves)
         
     }
 
@@ -244,12 +287,12 @@ mod movegen_tests{
     #[test]
     pub fn test_get_rook_attacks(){
         let mut position = Position::load_from_fen("8/3b4/8/8/Q2R4/8/8/3n4 w - - 0 1".to_string());
-        let at = AttackTable::new(Dimensions { height: 16, width: 16 });
+        let mvgen = MoveGenerator::new(Dimensions { height:12, width:12 });
         let pos = 67;
         let row = to_row(pos) as i8;
         let col = to_col(pos) as i8;
-        display_bitboard_with_board_desc(&(at.diagonals.get(&(col-row)).unwrap()), "Diagonal from pos");
-        display_bitboard_with_board_desc(&(at.anti_diagonals.get(&(col+row)).unwrap()), "aNTI Diagonal from pos");
+        display_bitboard_with_board_desc(&(mvgen.attack_table.diagonals.get(&(col-row)).unwrap()), "Diagonal from pos");
+        display_bitboard_with_board_desc(&(mvgen.attack_table.anti_diagonals.get(&(col+row)).unwrap()), "aNTI Diagonal from pos");
     }
     #[test]
     pub fn print_helper_test(){

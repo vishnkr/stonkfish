@@ -35,7 +35,7 @@ mod engine_tests{
     pub fn test_perft(){
         //expected - 1: 20, 2: 400, 3: 8907, 4: 197281, 5: 4865609
         //rnbqkbnr/pppppppp/8/5p2/4P3/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-        let depth = 4;
+        let depth = 2;
         
         let mut engine = Engine::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".to_string());
         

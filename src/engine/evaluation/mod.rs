@@ -2,7 +2,7 @@ mod piece_sq;
 
 use std::collections::HashMap;
 use arrayvec::ArrayVec;
-pub use crate::engine::position::{Position,piece::PieceSet,piece::PieceType};
+pub use crate::engine::position::{Position,piece::PieceCollection,piece::PieceType};
 pub use crate::engine::move_generation::att_table::SlideDirection;
 
 use self::piece_sq::PieceSquareTables;
@@ -29,7 +29,7 @@ impl Evaluator{
         self.get_material_eval_score(position)
     }
 
-    pub fn calc_material_score(&mut self,piece_set: &PieceSet)->isize{
+    pub fn calc_material_score(&mut self,piece_set: &PieceCollection)->isize{
         let material_score = piece_set.king.bitboard.count_ones() as isize * KING_CP_SCORE + 
         piece_set.pawn.bitboard.count_ones() as isize * PAWN_CP_SCORE + 
         piece_set.queen.bitboard.count_ones() as isize * QUEEN_CP_SCORE + 
@@ -43,7 +43,7 @@ impl Evaluator{
         let mut total_score = 0;
         for piece_set in position.pieces.iter(){
             println!("ts {}",self.calc_material_score(piece_set));
-            if position.turn as u8 ==piece_set.player { total_score += self.calc_material_score(piece_set);}
+            if position.turn ==piece_set.player { total_score += self.calc_material_score(piece_set);}
             else { total_score -= self.calc_material_score(piece_set);}
         }
         total_score

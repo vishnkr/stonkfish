@@ -1,8 +1,8 @@
 use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::engine::{
-    bitboard::{Bitboard,to_pos,to_row,to_col},
-    position::{Dimensions,Color},
+    bitboard::{Bitboard,to_pos,to_row,to_col, self},
+    position::{Dimensions,Color, piece::{Piece, PieceRepr}},
     utils::get_rank_attacks,
 };
 
@@ -19,10 +19,10 @@ pub enum SlideDirection{
 }
 
 pub struct AttackTable{
-    pub knight_attacks: ArrayVec::<Bitboard,256>,
-    pub king_attacks:ArrayVec::<Bitboard,256>,
-    pub pawn_attacks:[ArrayVec::<Bitboard,256>;2],
-    pub slide_attacks:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
+    //pub knight_attacks: ArrayVec::<Bitboard,256>,
+    //pub king_attacks:ArrayVec::<Bitboard,256>,
+    //pub pawn_attacks:[ArrayVec::<Bitboard,256>;2],
+    pub slide_targets:HashMap<SlideDirection,ArrayVec::<Bitboard,256>>,
     pub occupancy_lookup: Vec<Vec<u16>>,
     pub files: Vec<Bitboard>,
     pub ranks: Vec<Bitboard>,
@@ -31,55 +31,51 @@ pub struct AttackTable{
     pub main_diagonal: Bitboard,
     pub anti_diagonal: Bitboard,
     pub full_bitboard:Bitboard,
+    pub jump_targets: HashMap<PieceRepr,Vec<Bitboard>>
 }
 
 impl AttackTable{
-    pub fn new(dimensions:Dimensions)->Self{
+    pub fn new()->Self{
         let dirs = vec![SlideDirection::East,SlideDirection::North,SlideDirection::West,
             SlideDirection::South,SlideDirection::NorthEast,SlideDirection::NorthWest,
             SlideDirection::SouthEast,SlideDirection::SouthWest];
-        let mut knight_attacks = ArrayVec::<Bitboard,256>::new();
-        let mut king_attacks = ArrayVec::<Bitboard,256>::new();
-        let mut pawn_attacks = [ArrayVec::<Bitboard,256>::new(),ArrayVec::<Bitboard,256>::new()];
-        let mut slide_attacks:HashMap<SlideDirection, ArrayVec::<Bitboard,256>> = Self::init_slide_hashmap(&dirs);
+        //let mut knight_attacks = ArrayVec::<Bitboard,256>::new();
+        //let mut king_attacks = ArrayVec::<Bitboard,256>::new();
+        //let mut pawn_attacks = [ArrayVec::<Bitboard,256>::new(),ArrayVec::<Bitboard,256>::new()];
+        let mut slide_targets:HashMap<SlideDirection, ArrayVec::<Bitboard,256>> = Self::init_slide_hashmap(&dirs);
         let mut diagonals = Self::init_diagonal_hashmap(false);
         let mut anti_diagonals = Self::init_diagonal_hashmap(true);
-        let width = dimensions.width as i8;
-        let height = dimensions.height as i8;
         let mut files = vec![Bitboard::zero();16];
         let mut ranks = vec![Bitboard::zero();16];
         let mut full_bitboard = Bitboard::zero();
-        let knight_offsets:[(i8,i8);8] = [(2,1),(2,-1),(-2,1),(-2,-1),(1,2),(1,-2),(-1,2),(-1,-2)];
-        let king_offsets:[(i8,i8);8] = [(0,1),(0,-1),(1,0),(-1,0),(1,-1),(-1,1),(1,1),(-1,-1)];
+
         for i in 0..16{
             for j in 0..16{
                 let square = to_pos(i as u8, j as u8);
-                king_attacks.push(Bitboard::zero());
-                knight_attacks.push(Bitboard::zero());
-                pawn_attacks[Color::BLACK as usize].push(Bitboard::zero());
-                pawn_attacks[Color::WHITE as usize].push(Bitboard::zero());
-                Self::mask_slide(i, j,&dirs,&mut slide_attacks,square);
-                Self::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
-                Self::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
-                Self::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
+                //king_attacks.push(Bitboard::zero());
+                //knight_attacks.push(Bitboard::zero());
+                //pawn_attacks[Color::BLACK as usize].push(Bitboard::zero());
+                //pawn_attacks[Color::WHITE as usize].push(Bitboard::zero());
+                Self::mask_slide(i, j,&dirs,&mut slide_targets,square);
+               //Self::mask_jump(i,j, width, height, &knight_offsets, &mut knight_attacks[square]);
+                //Self::mask_jump(i,j, width, height, &king_offsets, &mut king_attacks[square]);
+                //Self::mask_pawn_attacks(i,j,width,height,&mut pawn_attacks);
                 files[j as usize].set_bit(square,true);
                 ranks[i as usize].set_bit(square,true);
-                if i <height && j<width{
-                    full_bitboard.set_bit(square,true);
-                }
+                
                 diagonals.get_mut(&(j-i)).unwrap().set_bit(square,true);
                 anti_diagonals.get_mut(&(j+i)).unwrap().set_bit(square,true);
 
             }
         }
         let occupancy_lookup = Self::gen_occupancy_lookup();
-        let main_diagonal = &slide_attacks.get(&SlideDirection::SouthWest).unwrap()[15] | &slide_attacks.get(&SlideDirection::NorthEast).unwrap()[240];
-        let anti_diagonal = &slide_attacks.get(&SlideDirection::SouthEast).unwrap()[0] | &slide_attacks.get(&SlideDirection::NorthWest).unwrap()[255];
+        let main_diagonal = &slide_targets.get(&SlideDirection::SouthWest).unwrap()[15] | &slide_targets.get(&SlideDirection::NorthEast).unwrap()[240];
+        let anti_diagonal = &slide_targets.get(&SlideDirection::SouthEast).unwrap()[0] | &slide_targets.get(&SlideDirection::NorthWest).unwrap()[255];
         Self {
-            knight_attacks,
-            king_attacks,
-            pawn_attacks,
-            slide_attacks,
+            //knight_attacks,
+           // king_attacks,
+            //pawn_attacks,
+            slide_targets,
             occupancy_lookup,
             files,
             ranks,
@@ -87,7 +83,8 @@ impl AttackTable{
             anti_diagonals,
             main_diagonal,
             anti_diagonal,
-            full_bitboard
+            full_bitboard,
+            jump_targets: HashMap::new(),
         }
     }
     
@@ -153,19 +150,19 @@ impl AttackTable{
         self.ranks[rank].to_owned()
     }
 
-    pub fn get_king_attacks(&self,position:u8)->Bitboard{
+    /*pub fn get_king_attacks(&self,position:u8)->Bitboard{
         self.king_attacks[position as usize].to_owned()
-    }
+    }*/
 
-    pub fn get_knight_attacks(&self,position:u8)->Bitboard{
+    /*pub fn get_knight_attacks(&self,position:u8)->Bitboard{
         self.knight_attacks[position as usize].to_owned()
-    }
+    }*/
 
-    pub fn get_pawn_attacks(&self,position:u8,color:Color,opponent:&Bitboard)->Bitboard{
+    /*pub fn get_pawn_attacks(&self,position:u8,color:Color,opponent:&Bitboard)->Bitboard{
         &self.pawn_attacks[color as usize][position as usize] & opponent
-    }
+    }*/
 
-    pub fn get_pawn_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
+    /*pub fn get_pawn_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
         let row = to_row(position);
         let next_rank_bb = match color {
             // bug causing subtraction overflow for depth>5, check pawn is only at rank 2-7 before calling this method?
@@ -194,12 +191,44 @@ impl AttackTable{
         };
         (single_push | double_push) & !opponent
     }
-
-    pub fn get_pawn_attacks_and_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
+    */
+    /*pub fn get_pawn_attacks_and_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
         self.get_pawn_pushes(position, color, dimensions, player_bb, opponent) | self.get_pawn_attacks(position, color, opponent)
+    }*/
+
+    pub fn get_diagonal_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
+        let (row,col) = (to_row(square) as i8,to_col(square) as i8);
+
+        let diagonal_as_rank = self.get_diagonal_occupancy_as_rank(occupancy, false, square);
+
+        &( Bitboard::zero() | diagonal_as_rank)
+            .overflowing_mul(&self.files[0]).0 & self.diagonals.get(&(col-row))
+            .unwrap()
     }
 
-    pub fn get_bishop_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
+    pub fn get_anti_diagonal_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
+        let (row,col) = (to_row(square) as i8,to_col(square) as i8);
+
+        let anti_diagonal_as_rank = self.get_diagonal_occupancy_as_rank(occupancy, true,square);
+
+        &(Bitboard::zero() | anti_diagonal_as_rank)
+        .overflowing_mul(&self.files[0]).0 & self.anti_diagonals.get(&(col + row))
+        .unwrap()
+    }
+
+    pub fn get_rank_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
+        let (row,col) = (to_row(square),to_col(square));
+        Bitboard::zero() | self.get_rank_occupancy(occupancy, square) << (16*row)
+    }
+
+    pub fn get_file_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
+        let (row,col) = (to_row(square),to_col(square));
+        let file_occupancy_as_rank = self.insert_rank_into_first_rank(self.get_file_occupancy_as_rank(occupancy, square));
+        self.map_rank_to_first_file(&file_occupancy_as_rank,square) << col
+    }
+
+    
+    /*pub fn get_bishop_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
         let row = to_row(position);
         let col = to_col(position);
         // diagonal attack -> diagonal.get(pos) & occupancy ->convert diagonal to rank -> lookup occupancy -> convert rank to diagonal
@@ -210,9 +239,9 @@ impl AttackTable{
         let anti_diagonal_attacks = &(Bitboard::zero() | anti_diagonal_as_rank).overflowing_mul(&self.files[0]).0 & self.anti_diagonals.get(&(col as i8 + row as i8)).unwrap();
         
         diagonal_attacks | anti_diagonal_attacks
-    }
+    }*/
 
-    pub fn get_rook_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
+    /*pub fn get_rook_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
         let row = to_row(position);
         let col = to_col(position);
         // file attacks
@@ -228,7 +257,7 @@ impl AttackTable{
         let row = to_row(pos);
         let rank_occupancy = (rank_map.byte(0).unwrap() as u16) | ((rank_map.byte(1).unwrap() as u16) << 8);
         self.get_valid_occupancy(rank_occupancy.reverse_bits(),row)
-    }   
+    }   */
 
     pub fn get_diagonal_occupancy_as_rank(&self,occupancy:&Bitboard,is_anti_diagonal:bool,pos:u8)->u16{
         let col = to_col(pos);
@@ -244,15 +273,14 @@ impl AttackTable{
         self.get_valid_occupancy(rank_occupancy,col)
     }
 
-    pub fn get_rank_occupancy(&self,occupancy:&Bitboard,pos:u8)->u16{
-        let row = to_row(pos);
-        let col = to_col(pos);
+    pub fn get_rank_occupancy(&self,occupancy:&Bitboard,square:u8)->u16{
+        let (row,col) = (to_row(square),to_col(square));
         let rank = (&self.ranks[row as usize] & occupancy) >> (16*row);
         self.get_valid_occupancy((rank.byte(0).unwrap() as u16) | (((rank.byte(1).unwrap()) as u16) << 8),col)
     }
 
-    pub fn get_valid_occupancy(&self,rank:u16,file:u8)->u16{
-        self.occupancy_lookup[file as usize][rank as usize]
+    pub fn get_valid_occupancy(&self,occ_rank:u16,file:u8)->u16{
+        self.occupancy_lookup[file as usize][occ_rank as usize]
     }
 
     pub fn mask_jump(x:i8,y:i8,width:i8,height:i8,offsets:&[(i8,i8)],bb:&mut Bitboard){
@@ -351,8 +379,7 @@ impl AttackTable{
 
     pub fn map_rank_to_first_file(&self, bb: &Bitboard, pos: u8) -> Bitboard {
         let mut bb2 = bb.overflowing_mul(&self.anti_diagonal).0;
-        let ret = (bb2 >> 15) & &self.files[0];
-        ret
+        (bb2 >> 15) & &self.files[0]
     }
 
 
