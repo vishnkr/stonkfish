@@ -20,11 +20,11 @@ impl Zobrist{
         let random_side = rng.gen::<u64>();
         let black_to_move = rng.gen::<u64>();
         let en_passant_keys = Vec::new();
-        for i in 0..2{
+        for _ in 0..2{
             let mut hashmap = HashMap::new();
             for piece_type in PieceType::as_vec(){
                 let mut hash_vec = Vec::new();
-                for sq in 0..256{
+                for _ in 0..256{
                     hash_vec.push(rng.gen::<u64>());
                 }
                 //println!("{:?}",hash_vec);
@@ -39,10 +39,10 @@ impl Zobrist{
 
 #[cfg(test)]
 mod zobrist_test{
-    use super::*;
+    
     #[test]
     fn print_zobrist_keys(){
-        let zobrist = Zobrist::new();
+        //let zobrist = Zobrist::new();
 
     }
 }

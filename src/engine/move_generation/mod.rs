@@ -1,76 +1,162 @@
+use arrayvec::ArrayVec;
 use moves::*;
 use crate::engine::{
     bitboard::*,
-    position::*,
-    utils::get_rank_attacks,
+    position::{*, piece::Piece},
 };
-use std::vec::{Vec};
+use std::{vec::{Vec}, convert::TryInto, collections::HashMap};
 use self::att_table::AttackTable;
-use crate::AdditionalInfo::PromoPieceType;
 use lazy_static::lazy_static;
-use super::position::piece::PieceType;
+
+use super::position::piece::PieceRepr;
 
 pub mod moves;
 pub mod att_table;
 
+pub type JumpAttackTable = HashMap<PieceRepr,ArrayVec::<Bitboard,256>>;
 
 lazy_static! {
     static ref LAZY_ATTACK_TABLE: AttackTable = AttackTable::new();
 }
 
-pub struct SizeDependentBitboards{
-    pub full_bitboard:Bitboard,
-    pub row_boundary:Bitboard,
-    pub col_boundary:Bitboard
-}
-
-impl SizeDependentBitboards{
-    pub fn new(dimensions:&Dimensions)->Self{
-        let mut full_bitboard = Bitboard::zero();
-        let mut row_boundary = Bitboard::zero();
-        let mut col_boundary = Bitboard::zero();
-        for i in 0..dimensions.height{
-            for j in 0..dimensions.width{
-                full_bitboard.set_bit(to_pos(i,j),true);
-                if i==0||i==dimensions.height-1{
-                    row_boundary.set_bit(to_pos(i,j), true);
-                }
-                if j==0||i==dimensions.width-1{
-                    row_boundary.set_bit(to_pos(i,j), true);
-                }
-            }
-        }
-        SizeDependentBitboards { full_bitboard, row_boundary , col_boundary}
-    }
-}
-
 pub struct MoveGenerator{
     pub attack_table: &'static AttackTable,
     pub dimensions: Dimensions,
-    pub size_depenedent_bitboards:SizeDependentBitboards
+    pub size_dependent_bitboards:SizeDependentBitboards,
+    pub jump_attack_table: JumpAttackTable
 }
 
 
 impl MoveGenerator{
-    pub fn new(dimensions:Dimensions)->Self{
+    pub fn new(dimensions:Dimensions,jump_offsets:Option<Vec<JumpOffset>>)->Self{
+        let size_dependent_bitboards = SizeDependentBitboards::new(&dimensions);
+        let mut jump_attack_table:JumpAttackTable = HashMap::new();
+        if let Some(jump_info) = jump_offsets{
+            Self::setup_jump_targets(&mut jump_attack_table, &jump_info);
+        }
         Self{
             attack_table: &LAZY_ATTACK_TABLE,
             dimensions,
-            size_depenedent_bitboards: SizeDependentBitboards::new(&dimensions)
+            size_dependent_bitboards,
+            jump_attack_table,
         }
     }
 
-    pub fn generate_pseudo_legal_moves(&self,cur_position:&mut Position)->impl Iterator<Item=Move>{
-        let piece_collection = &cur_position.pieces[cur_position.turn as usize];
-        let moves = vec![];
+    pub fn setup_jump_targets(jump_attack_table:&mut JumpAttackTable ,piece_info:&Vec<JumpOffset>){
+        for (piece_repr,jump_offsets) in piece_info{
+            Self::setup_jump_target(jump_attack_table,piece_repr,jump_offsets);
+        }
+    }
+
+    pub fn setup_jump_target(jump_attack_table:&mut JumpAttackTable,piece_repr:&PieceRepr,offsets:&Vec<(i8,i8)>){
+            let mut jump_targets_bitboards = ArrayVec::<Bitboard,256>::new();
+            for i in 0..16{
+                for j in 0..16{
+                    let mut bb = Bitboard::zero();
+                    for (dx,dy) in offsets{
+                        let (x,y) = (i+dx,j+dy);
+                        if x>=0 && x<16 && y>=0 && y<16{
+                            bb.set_bit(to_pos(x as u8,y as u8), true);
+                        }
+                    }
+                    jump_targets_bitboards.push(bb);
+                }         
+            }      
+        jump_attack_table.insert(piece_repr.to_ascii_lowercase(), jump_targets_bitboards);
+    }
+
+    pub  fn get_all_attacks_bb(&self,piece:&Piece,src:u8,occupancy:&Bitboard)->Bitboard{
+        let mut attack_bb = Bitboard::zero();
+        attack_bb |= self.generate_slide_moves(src,&piece,occupancy);
+        attack_bb |= self.generate_jump_moves(&piece,src);
+        attack_bb
+    }
+
+    pub fn generate_pseudolegal_moves(&self,cur_position:&mut Position)->impl Iterator<Item=Move>{
         let color = cur_position.turn;
-        let opponent_bb = &cur_position.pieces[!color as usize].occupied;
-        for piece in piece_collection{
-            generate_
+        let opponent_bb = cur_position.piece_collections[!color as usize].occupied.clone();
+        let player_pieces = &mut cur_position.piece_collections[color as usize];
+        
+        let occupied_bb = &cur_position.position_bitboard;
+
+        let mut moves = vec![];
+        let _occ = &player_pieces.occupied;
+        for (char,piece) in player_pieces.pieces.iter_mut(){
+            
+            let mut piece_bb = piece.bitboard.clone();
+            while !piece_bb.is_zero(){
+                let src = piece_bb.lowest_one().unwrap_or(0) as u8;
+                let mut attack_bb = self.get_all_attacks_bb(piece, src, occupied_bb);
+                display_bitboard_with_board_desc(&piece_bb, format!("piece - {}", char).as_str());
+                display_bitboard_with_board_desc(&attack_bb, format!("piece attack_bb - {}", char).as_str());
+                if piece.props.can_double_jump{
+                    self.generate_double_jump_moves(&mut moves,&piece,src,occupied_bb);
+                }
+                piece_bb.set_bit(src as usize, false);
+                attack_bb |= &self.size_dependent_bitboards.full_bitboard;
+                flatten_bitboard(&mut attack_bb, &mut moves, &opponent_bb, piece.piece_type, src);
+            }
+            
         }
         moves.into_iter()
     }
 
+    pub fn generate_slide_moves(&self,square:u8,piece:&Piece,occupancy:&Bitboard)->Bitboard{
+        let mut final_bb = Bitboard::zero();
+        let (mut can_rank_slide,mut can_file_slide,mut can_diagonal_slide,mut can_antidiagonal_slide) = (false,false,false,false);
+        for (dx,dy) in piece.props.slide_directions.iter(){
+            match (dx,dy){
+                (1,0) | (-1,0) => can_rank_slide = true,
+                (0,1) | (0,-1) => can_file_slide = true,
+                (1,1) | (-1,-1) => can_antidiagonal_slide = true,
+                (1,-1) | (-1,1) => can_diagonal_slide = true,
+                _=>{}
+            }
+        }
+        if can_rank_slide {
+            final_bb |= self.attack_table.get_rank_attacks(square, occupancy);
+        }
+        if  can_file_slide {
+            final_bb |= self.attack_table.get_file_attacks(square, occupancy);
+        }
+        if can_diagonal_slide {
+            final_bb |= self.attack_table.get_diagonal_attacks(square, occupancy);
+        }
+        if  can_antidiagonal_slide {
+            final_bb |= self.attack_table.get_anti_diagonal_attacks(square, occupancy);
+        }
+        final_bb
+    }   
+
+    pub fn generate_jump_moves(&self,piece:&Piece,square:u8)->Bitboard{
+        let piece_repr = &piece.piece_repr;
+        let mut final_bb = Bitboard::zero();
+        println!("ja-table - {:#?}",self.jump_attack_table);
+        match self.jump_attack_table.get(&piece_repr.to_ascii_lowercase()){
+            Some(jump_offsets) =>{
+                final_bb |= &jump_offsets[square as usize];
+            },
+            None =>{}//throw error }s
+        }
+        final_bb
+    }
+
+    pub fn generate_double_jump_moves(&self,moves:&mut Vec<Move>,piece:&Piece,src:u8,occupied:&Bitboard){
+        let (src_row,src_col) = (to_row(src),to_col(src));
+        if (piece.props.double_jump_squares.as_ref().unwrap()).contains(&src){
+            for (dx,dy) in piece.props.jump_offsets.iter(){
+                let (row,col) = ((dx+src_row as i8).try_into().unwrap(),(dy+src_col as i8).try_into().unwrap());
+                let dest = to_pos(row,col);
+                if row<self.dimensions.height 
+                    && col<=self.dimensions.width 
+                    && !occupied.bit(dest).unwrap(){
+                    moves.push(Move::encode_move(src, dest as u8, MType::Quiet, None));
+                }
+                
+            }
+        }
+    }
+    /* 
     pub fn generate_pseudolegal_moves2(&self,cur_position:&mut Position)-> impl Iterator<Item=Move>{
         let mut move_masks :Vec<MoveMask> = Vec::new();
         let color = cur_position.turn;
@@ -208,7 +294,7 @@ impl MoveGenerator{
         //move_masks.into_iter().flatten().into_iter().chain(non_quiet_moves.into_iter())
         moves.into_iter().chain(non_quiet_moves)
         
-    }
+    }*/
 
 
     pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
@@ -230,12 +316,13 @@ impl MoveGenerator{
     }
 
     pub fn is_king_under_check(&self,position:&mut Position)-> bool{
-        let pieces = &mut position.pieces;
+        
         let color = position.turn.clone();
         let opponent_color = Position::get_opponent_color(position.turn);
-        let mut opponent_bb =  &position.position_bitboard & !&pieces[color as usize].occupied;
+        let mut opponent_bb =  &position.position_bitboard & !&position.piece_collections[color as usize].occupied;
+        let pieces = &mut position.piece_collections;
         let occupancy = &position.position_bitboard;
-
+        /* 
         while !opponent_bb.is_zero(){
                 let mut pos = opponent_bb.lowest_one().unwrap_or(0) as u8;
                 let piece = pieces[opponent_color as usize].get_mut_piece_from_sq(pos.into()).unwrap();
@@ -255,6 +342,15 @@ impl MoveGenerator{
                     return true
                 }
                 opponent_bb.set_bit(pos.into(),false);
+        }*/
+        while !opponent_bb.is_zero(){
+            let src = opponent_bb.lowest_one().unwrap_or(0) as u8;
+            let piece = pieces[opponent_color as usize].get_mut_piece_from_sq(src.into()).unwrap();
+            let attack_bb = self.get_all_attacks_bb(piece, src, occupancy);
+            if !(attack_bb & &pieces[color as usize].get_king_mut().bitboard).is_zero(){
+                return true
+            }
+            opponent_bb.set_bit(src.into(),false);
         }
 
         false
@@ -276,7 +372,6 @@ pub fn generate_legal_moves(move_generator :&MoveGenerator,position :&mut Positi
 #[cfg(test)]
 mod movegen_tests{
     use super::*;
-    use crate::engine::bitboard::{display_bitboard};
     #[test]
     pub fn test_rank_attack_occupancy_lookup(){
         let occupancy_lookup:Vec<Vec<u16>> = AttackTable::gen_occupancy_lookup();
@@ -286,8 +381,8 @@ mod movegen_tests{
 
     #[test]
     pub fn test_get_rook_attacks(){
-        let mut position = Position::load_from_fen("8/3b4/8/8/Q2R4/8/8/3n4 w - - 0 1".to_string());
-        let mvgen = MoveGenerator::new(Dimensions { height:12, width:12 });
+        let position = fen::load_from_fen("8/3b4/8/8/Q2R4/8/8/3n4 w - - 0 1".to_string());
+        let mvgen = MoveGenerator::new(Dimensions { height:12, width:12 },Some(position.get_jump_offets()));
         let pos = 67;
         let row = to_row(pos) as i8;
         let col = to_col(pos) as i8;
@@ -297,19 +392,19 @@ mod movegen_tests{
     #[test]
     pub fn print_helper_test(){
         let dimensions = Dimensions{width:8,height:8};
-        let mvgen = MoveGenerator::new(dimensions);
-        let mut position = Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let mut position = fen::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let mvgen = MoveGenerator::new(dimensions,Some(position.get_jump_offets()));
         let val = mvgen.generate_pseudolegal_moves(&mut position);
         for mv in val{
-            println!("{}",mv);
+            println!("{}",mv.to_algebraic_notation(8, Color::WHITE, &position.piece_collections[Color::WHITE as usize]));
         }
     }
 
     #[test]
     pub fn test_legal_movegen(){
         let dimensions = Dimensions{width:8,height:8};
-        let mvgen = MoveGenerator::new(dimensions);
-        let mut position = Position::load_from_fen("3r4/8/8/8/8/8/3R4/3K4 w - - 0 1".to_string());
+        let mut position = fen::load_from_fen("3r4/8/8/8/8/8/3R4/3K4 w - - 0 1".to_string());
+        let mvgen = MoveGenerator::new(dimensions,Some(position.get_jump_offets()));
         for mv in generate_legal_moves(&mvgen,&mut position){
             mv.display_move();
         }
@@ -319,20 +414,13 @@ mod movegen_tests{
     #[test]
     pub fn test_unmake_move(){
         let dimensions = Dimensions{width:8,height:8};
-        let mvgen = MoveGenerator::new(dimensions);
-        let position = &mut Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
-        let original = &Position::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let position = &mut fen::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
+        let mvgen = MoveGenerator::new(dimensions,Some(position.get_jump_offets()));
+        let original = &fen::load_from_fen("3k4/8/8/8/1n3b2/P1P1P3/1PP3P1/3K4 w - - 0 1".to_string());
         for mv in mvgen.generate_pseudolegal_moves(position){
             position.make_move(&mv);
             position.unmake_move( &mv);
             assert_eq!(original.position_bitboard,position.position_bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].occupied,position.pieces[Color::WHITE as usize].occupied);
-            assert_eq!(original.pieces[Color::WHITE as usize].pawn.bitboard,position.pieces[Color::WHITE as usize].pawn.bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].king.bitboard,position.pieces[Color::WHITE as usize].king.bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].knight.bitboard,position.pieces[Color::WHITE as usize].knight.bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].queen.bitboard,position.pieces[Color::WHITE as usize].queen.bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].rook.bitboard,position.pieces[Color::WHITE as usize].rook.bitboard);
-            assert_eq!(original.pieces[Color::WHITE as usize].bishop.bitboard,position.pieces[Color::WHITE as usize].bishop.bitboard);
         }
     }
 

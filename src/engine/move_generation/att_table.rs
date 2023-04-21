@@ -1,8 +1,8 @@
 use arrayvec::ArrayVec;
 use std::collections::HashMap;
 use crate::engine::{
-    bitboard::{Bitboard,to_pos,to_row,to_col, self},
-    position::{Dimensions,Color, piece::{Piece, PieceRepr}},
+    bitboard::{Bitboard,to_pos,to_row,to_col},
+    position::Color,
     utils::get_rank_attacks,
 };
 
@@ -31,7 +31,6 @@ pub struct AttackTable{
     pub main_diagonal: Bitboard,
     pub anti_diagonal: Bitboard,
     pub full_bitboard:Bitboard,
-    pub jump_targets: HashMap<PieceRepr,Vec<Bitboard>>
 }
 
 impl AttackTable{
@@ -39,7 +38,6 @@ impl AttackTable{
         let dirs = vec![SlideDirection::East,SlideDirection::North,SlideDirection::West,
             SlideDirection::South,SlideDirection::NorthEast,SlideDirection::NorthWest,
             SlideDirection::SouthEast,SlideDirection::SouthWest];
-        //let mut knight_attacks = ArrayVec::<Bitboard,256>::new();
         //let mut king_attacks = ArrayVec::<Bitboard,256>::new();
         //let mut pawn_attacks = [ArrayVec::<Bitboard,256>::new(),ArrayVec::<Bitboard,256>::new()];
         let mut slide_targets:HashMap<SlideDirection, ArrayVec::<Bitboard,256>> = Self::init_slide_hashmap(&dirs);
@@ -47,7 +45,7 @@ impl AttackTable{
         let mut anti_diagonals = Self::init_diagonal_hashmap(true);
         let mut files = vec![Bitboard::zero();16];
         let mut ranks = vec![Bitboard::zero();16];
-        let mut full_bitboard = Bitboard::zero();
+        let full_bitboard = Bitboard::zero();
 
         for i in 0..16{
             for j in 0..16{
@@ -72,9 +70,6 @@ impl AttackTable{
         let main_diagonal = &slide_targets.get(&SlideDirection::SouthWest).unwrap()[15] | &slide_targets.get(&SlideDirection::NorthEast).unwrap()[240];
         let anti_diagonal = &slide_targets.get(&SlideDirection::SouthEast).unwrap()[0] | &slide_targets.get(&SlideDirection::NorthWest).unwrap()[255];
         Self {
-            //knight_attacks,
-           // king_attacks,
-            //pawn_attacks,
             slide_targets,
             occupancy_lookup,
             files,
@@ -84,10 +79,10 @@ impl AttackTable{
             main_diagonal,
             anti_diagonal,
             full_bitboard,
-            jump_targets: HashMap::new(),
         }
     }
     
+
     pub fn gen_occupancy_lookup()->Vec<Vec<u16>>{
         
 
@@ -122,16 +117,15 @@ impl AttackTable{
         occupancy_lookup
     }
 
-    //TODO: split rank and file slide attacks further for each of the 8 directions for custom move patterns
     pub fn get_rank_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
-        let mut rank_attack = self.occupancy_lookup[file][occupancy];
+        let rank_attack = self.occupancy_lookup[file][occupancy];
         let mut rank_attack_bb = Bitboard::zero();
         rank_attack_bb |= rank_attack;
         rank_attack_bb << rank
     }   
 
     pub fn get_file_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
-        let mut rank_attack = self.occupancy_lookup[file][occupancy];
+        let rank_attack = self.occupancy_lookup[file][occupancy];
         let mut rank_attack_bb = Bitboard::zero();
         rank_attack_bb |= rank_attack;
         rank_attack_bb << rank
@@ -144,57 +138,11 @@ impl AttackTable{
 
     pub fn get_rank(&self,pos:u8)->Bitboard{
         let rank = to_row(pos) as usize;
-        if rank<0 || rank>15{
+        if  rank>15{
             return Bitboard::zero()
         }
         self.ranks[rank].to_owned()
     }
-
-    /*pub fn get_king_attacks(&self,position:u8)->Bitboard{
-        self.king_attacks[position as usize].to_owned()
-    }*/
-
-    /*pub fn get_knight_attacks(&self,position:u8)->Bitboard{
-        self.knight_attacks[position as usize].to_owned()
-    }*/
-
-    /*pub fn get_pawn_attacks(&self,position:u8,color:Color,opponent:&Bitboard)->Bitboard{
-        &self.pawn_attacks[color as usize][position as usize] & opponent
-    }*/
-
-    /*pub fn get_pawn_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
-        let row = to_row(position);
-        let next_rank_bb = match color {
-            // bug causing subtraction overflow for depth>5, check pawn is only at rank 2-7 before calling this method?
-            Color::WHITE => self.get_rank(position-16),
-            Color::BLACK => self.get_rank(position+16)
-        };
-        let single_push :Bitboard = self.get_king_attacks(position) & self.get_file(position) & next_rank_bb;
-        let mut double_push :Bitboard = Bitboard::zero();
-        match color{
-            Color::WHITE => {
-                if row == dimensions.height-2 {
-                    // no double push allowed if single push is blocked by own piece
-                    if !player_bb.bit(single_push.lowest_one().unwrap()).unwrap(){
-                        double_push = &single_push >> 16;
-                    }
-                    
-                }
-            },
-            Color::BLACK => {
-                if row == 1 {
-                    if !player_bb.bit(single_push.lowest_one().unwrap()).unwrap(){
-                        double_push = &single_push << 16;
-                    }
-                }
-            }
-        };
-        (single_push | double_push) & !opponent
-    }
-    */
-    /*pub fn get_pawn_attacks_and_pushes(&self,position:u8,color:Color,dimensions:&Dimensions,player_bb:&Bitboard,opponent:&Bitboard)->Bitboard{
-        self.get_pawn_pushes(position, color, dimensions, player_bb, opponent) | self.get_pawn_attacks(position, color, opponent)
-    }*/
 
     pub fn get_diagonal_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
         let (row,col) = (to_row(square) as i8,to_col(square) as i8);
@@ -217,12 +165,13 @@ impl AttackTable{
     }
 
     pub fn get_rank_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
-        let (row,col) = (to_row(square),to_col(square));
-        Bitboard::zero() | self.get_rank_occupancy(occupancy, square) << (16*row)
+        let row = to_row(square);
+
+        Bitboard::zero() | self.insert_rank_into_first_rank(self.get_rank_occupancy(occupancy, square).reverse_bits()) << (16*row)
     }
 
     pub fn get_file_attacks(&self,square:u8,occupancy:&Bitboard)->Bitboard{
-        let (row,col) = (to_row(square),to_col(square));
+        let col = to_col(square);
         let file_occupancy_as_rank = self.insert_rank_into_first_rank(self.get_file_occupancy_as_rank(occupancy, square));
         self.map_rank_to_first_file(&file_occupancy_as_rank,square) << col
     }
@@ -250,19 +199,19 @@ impl AttackTable{
         // rank attacks
         let rank_occupancy_bitboard = self.insert_rank_into_first_rank(self.get_rank_occupancy(occupancy, position).reverse_bits()) << (16*row);
         &rank_occupancy_bitboard ^ &file_occupancy_bitboard 
-    }
+    }*/
 
     pub fn get_file_occupancy_as_rank(&self,occupancy:&Bitboard,pos:u8)->u16{
         let rank_map = self.map_file_to_first_rank(occupancy, pos);
         let row = to_row(pos);
         let rank_occupancy = (rank_map.byte(0).unwrap() as u16) | ((rank_map.byte(1).unwrap() as u16) << 8);
         self.get_valid_occupancy(rank_occupancy.reverse_bits(),row)
-    }   */
+    }   
 
     pub fn get_diagonal_occupancy_as_rank(&self,occupancy:&Bitboard,is_anti_diagonal:bool,pos:u8)->u16{
         let col = to_col(pos);
         let row = to_row(pos);
-        let mut diagonal = match is_anti_diagonal {
+        let diagonal = match is_anti_diagonal {
             false => self.diagonals.get(&(col as i8 - row as i8)).unwrap(),
             true => self.anti_diagonals.get(&(col as i8 + row as i8)).unwrap(),
             } 
@@ -368,8 +317,8 @@ impl AttackTable{
 
     pub fn map_file_to_first_rank(&self,bb:&Bitboard,pos:u8)->Bitboard{
        let file = to_col(pos);
-       let mut mask_a_file = (&self.files[file as usize] & bb)>> file;
-       let (mut masked_with_diagonal,valid) = mask_a_file.overflowing_mul(&self.anti_diagonal);
+       let mask_a_file = (&self.files[file as usize] & bb)>> file;
+       let (masked_with_diagonal,_) = mask_a_file.overflowing_mul(&self.anti_diagonal);
        &masked_with_diagonal >> (240)
     }
 
@@ -377,8 +326,8 @@ impl AttackTable{
         Bitboard::zero() | rank_occupancy.reverse_bits()
     }
 
-    pub fn map_rank_to_first_file(&self, bb: &Bitboard, pos: u8) -> Bitboard {
-        let mut bb2 = bb.overflowing_mul(&self.anti_diagonal).0;
+    pub fn map_rank_to_first_file(&self, bb: &Bitboard, _pos: u8) -> Bitboard {
+        let bb2 = bb.overflowing_mul(&self.anti_diagonal).0;
         (bb2 >> 15) & &self.files[0]
     }
 

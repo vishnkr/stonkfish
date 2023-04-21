@@ -2,27 +2,19 @@ use core::fmt;
 use std::convert::TryInto;
 use std::ops::Not;
 
-use crate::engine::bitboard::{Bitboard,to_pos,to_row,to_col};
+use crate::engine::bitboard::{Bitboard,to_row,to_col, display_bitboard_with_board_desc};
 use crate::engine::move_generation::moves::*;
 
 use self::fen::{RADIX, load_from_fen};
 use self::piece::{Piece,PieceType, PieceRepr};
 use self::piece_collection::PieceCollection;
 use self::zobrist::Zobrist;
-use super::evaluation::SlideDirection;
 
 pub mod zobrist;
 pub mod piece;
 pub mod piece_collection;
 pub mod fen;
-
-type JumpOffsets = (i16,i16);
-
-#[derive(Debug,Clone, PartialEq, Eq, Hash)]
-pub struct MovePattern{
-    jump_moves: Vec<JumpOffsets>,
-    slide_dirs: Vec<SlideDirection>,
-}
+pub type JumpOffset = (PieceRepr, Vec<(i8, i8)>);
 
 
 impl PieceType{
@@ -48,7 +40,7 @@ impl fmt::Debug for PieceType{
     }
 }
 
-#[derive(Copy, Clone,PartialEq,Debug)]
+#[derive(Copy, Clone,PartialEq,Debug,Eq,Hash)]
 pub enum Color{
     WHITE,
     BLACK
@@ -100,7 +92,7 @@ impl Dimensions{
     pub fn is_pos_in_range(&self, pos:usize)->bool{
         let row = to_row(pos.try_into().unwrap());
         let col = to_col(pos.try_into().unwrap());
-        col>=0 && col<=self.width && row>=0 && row<=self.height
+        col<=self.width && row<=self.height
     }
 }
 
@@ -192,11 +184,19 @@ impl Position{
     pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
         let src = from_to.0;
         let dest = from_to.1;
+        println!("looking at src: {} {:#?}",src,color);
+        for (char,piece) in self.piece_collections[color as usize].pieces.iter(){
+            println!("Piece {}",char);
+            display_bitboard_with_board_desc(&piece.bitboard,format!("piece - {}", char).as_str());
+        }
         let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(src).unwrap();
+        //println!("{:#?} got piece",piece);
         self.position_bitboard.set_bit(src,false);
         self.position_bitboard.set_bit(dest,true);
+        display_bitboard_with_board_desc(&self.position_bitboard,"position bitboard after move");
         piece.bitboard.set_bit(dest,true);
         piece.bitboard.set_bit(src,false);
+        display_bitboard_with_board_desc(&piece.bitboard,"piece bitboard after move");
     }
 
     pub fn unmake_move(&mut self,mv:&Move){
@@ -215,8 +215,8 @@ impl Position{
             MType::Capture =>{
                 let opponent_color:Color = Position::get_opponent_color(self.turn);
                 let captured_piece = self.recent_capture;
-                self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().0);
-                let piece:&mut Piece = self.piece_collections[self.turn as usize].get_mut_piece_from_sq(dest).unwrap();
+                self.undo_remove_piece(opponent_color,dest, captured_piece.unwrap().1);
+                let piece:&mut Piece = self.piece_collections[opponent_color as usize].get_mut_piece_from_sq(dest).unwrap();
                 self.position_bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(src,true);
                 piece.bitboard.set_bit(dest,false);
@@ -239,8 +239,8 @@ impl Position{
     pub fn get_zobrist_hash(&self)-> u64{
         let mut zobrist_hash_key = 0u64;
         for (i,collection) in self.piece_collections.iter().enumerate(){
-            for piece in collection.as_array(){
-                let mut bitboard = piece.bitboard.to_owned();
+            for (_,piece) in collection.pieces.iter(){
+                let mut bitboard = piece.bitboard.clone();
                 while !bitboard.is_zero(){
                     let pos = bitboard.lowest_one().unwrap_or(0);
                     zobrist_hash_key ^= self.zobrist_hash.piece_keys[i][&piece.piece_type][pos];
@@ -268,34 +268,55 @@ impl Position{
             Color::WHITE=> ((self.castling_rights)) & 1 == 1
         }
     }
+
+    pub fn get_jump_offets(&self)->Vec<JumpOffset>{
+        let jump:Vec<JumpOffset> = self.piece_collections[0]
+                .pieces
+                .values()
+                .map(|piece| (piece.piece_repr,piece.props.jump_offsets.clone()))
+                .collect();
+        jump
+    }
 }
 
 
 #[cfg(test)]
 mod position_tests{
-    use super::*;
-    #[test]
-    fn test_fen_to_position_conversion(){
-        let fen:String = "12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string();
-        let dimensions:Dimensions = Dimensions{width:12,height:12};
-        let turn:Color= Color::WHITE;
-        let result: Position = Position::load_from_fen(fen);
-        assert_eq!(result.dimensions,dimensions);
-        assert_eq!(result.turn,turn);
-    }
+    use crate::engine::position::*;
 
     #[test]
     fn test_eq_zobrist_hash(){
-        let pos1 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
-        let pos2 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        let pos1 = fen::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        let pos2 = fen::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
         assert_eq!(pos1.get_zobrist_hash(),pos2.get_zobrist_hash())
     }
 
     #[test]
     fn test_unequal_zobrist_hash(){
-        let pos1 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
-        let pos2 = Position::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string());
+        let pos1 = fen::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 b - - 1 44".to_string());
+        let pos2 = fen::load_from_fen("12/5p1k4/12/p2p1P6/5q6/P1PbN2p4/7P4/2Q3K5/12/12/12/12 w - - 1 44".to_string());
         assert_ne!(pos1.get_zobrist_hash(),pos2.get_zobrist_hash())
+    }
+
+    #[test]
+    pub fn test_make_move(){
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let mut position = load_from_fen(fen.to_string());
+        let result_fen = "rnbqkbnr/pppppppp/8/8/8/3P4/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
+        let result = load_from_fen(result_fen.to_string());
+        let mv = Move::encode_move(99, 83, MType::Quiet, None);
+        position.make_move(&mv);
+        assert_eq!(position.piece_collections,result.piece_collections);
+    }
+    #[test]
+    pub fn test_make_move2(){
+        let fen = "3r4/8/8/8/8/8/3R4/3K4 w - - 0 1";
+        let mut position = load_from_fen(fen.to_string());
+  
+        let result = load_from_fen(fen.to_string());
+        let mv = Move::encode_move(99, 83, MType::Quiet, None);
+        position.make_move(&mv);
+        assert_eq!(position.piece_collections,result.piece_collections);
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
 use super::move_generation::moves::{Move, MType};
 
@@ -53,7 +53,7 @@ impl MoveGenStats{
         println!("Moves per Depth:");
         let mut moves:Vec<&u32> = self.moves_per_depth.keys().collect();
         moves.sort();
-        for (depth) in moves {
+        for depth in moves {
             println!("Depth {}: {}", depth, self.moves_per_depth.get(depth).unwrap());
         }
     }

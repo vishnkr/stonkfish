@@ -1,6 +1,6 @@
-use crate::engine::bitboard::Bitboard;
+use crate::engine::bitboard::{Bitboard, to_pos};
 
-use super::{piece_collection::PieceCollection, Dimensions, get_dimensions, Color, Position};
+use super::{piece_collection::PieceCollection, Dimensions, get_dimensions, Color, Position, piece::Piece, zobrist::Zobrist};
 
 pub const RADIX: u32 = 10;
 
@@ -37,14 +37,19 @@ pub fn load_from_fen(fen:String) -> Position{
                     }
                 } else {
                     let all_pieces_bb: &mut Bitboard = if c.is_ascii_lowercase(){&mut black_piece_set.occupied} else {&mut white_piece_set.occupied};
-                    let bitboard: &mut Bitboard = match c.to_ascii_lowercase(){
-                        'p'=> if c.is_ascii_lowercase(){&mut black_piece_set.pawn.bitboard} else {&mut white_piece_set.pawn.bitboard}
-                        'k'=> if c.is_ascii_lowercase(){&mut black_piece_set.king.bitboard} else {&mut white_piece_set.king.bitboard}
-                        'b'=> if c.is_ascii_lowercase(){&mut black_piece_set.bishop.bitboard} else {&mut white_piece_set.bishop.bitboard}
-                        'n'=> if c.is_ascii_lowercase(){&mut black_piece_set.knight.bitboard} else {&mut white_piece_set.knight.bitboard}
-                        'r'=> if c.is_ascii_lowercase(){&mut black_piece_set.rook.bitboard} else {&mut white_piece_set.rook.bitboard}
-                        'q'=> if c.is_ascii_lowercase(){&mut black_piece_set.queen.bitboard} else {&mut white_piece_set.queen.bitboard}
-                        _=> continue
+                    let bitboard: &mut Bitboard = match c.is_ascii_lowercase(){
+                        true=>{
+                            if !black_piece_set.pieces.contains_key(&c){
+                                black_piece_set.pieces.insert(c, Piece::new_piece(Color::BLACK,c,&dimensions));
+                            }
+                            &mut black_piece_set.pieces.get_mut(&c).unwrap().bitboard
+                        }
+                        false=>{
+                            if !white_piece_set.pieces.contains_key(&c){
+                                white_piece_set.pieces.insert(c, Piece::new_piece(Color::WHITE,c,&dimensions));
+                            }
+                            &mut white_piece_set.pieces.get_mut(&c).unwrap().bitboard
+                        }
                     };
                     let pos = to_pos(row,col);
                     bitboard.set_bit(pos,true);
@@ -75,11 +80,48 @@ pub fn load_from_fen(fen:String) -> Position{
     Position{
         dimensions,
         turn,
-        pieces,
+        piece_collections:pieces,
         castling_rights,
         recent_capture: None,
         has_king_moved: false,
         position_bitboard,
         zobrist_hash : Zobrist::new()
+    }
+}
+
+#[cfg(test)]
+mod fen_tests{
+    use crate::engine::position::*;
+
+    #[test]
+    fn test_fen_to_position_conversion(){
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let position = load_from_fen(fen.to_string());
+    
+        assert_eq!(position.turn, Color::WHITE);
+        assert_eq!(position.dimensions.width, 8);
+        assert_eq!(position.dimensions.height, 8);
+        assert_eq!(position.position_bitboard.count_ones(), 32);
+        assert_eq!(position.piece_collections[0].pieces.get(&'P').unwrap().bitboard.count_ones(), 8);
+        assert_eq!(position.piece_collections[1].pieces.get(&'p').unwrap().bitboard.count_ones(), 8);
+        assert_eq!(position.piece_collections[0].pieces.get(&'N').unwrap().bitboard.count_ones(), 2);
+        assert_eq!(position.piece_collections[1].pieces.get(&'n').unwrap().bitboard.count_ones(), 2);
+        assert_eq!(position.piece_collections[0].pieces.get(&'K').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[1].pieces.get(&'k').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[0].pieces.get(&'R').unwrap().bitboard.count_ones(), 2);
+        assert_eq!(position.piece_collections[1].pieces.get(&'r').unwrap().bitboard.count_ones(), 2);
+        assert_eq!(position.piece_collections[0].pieces.get(&'Q').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[1].pieces.get(&'q').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[0].pieces.get(&'B').unwrap().bitboard.count_ones(), 2);
+        assert_eq!(position.piece_collections[1].pieces.get(&'b').unwrap().bitboard.count_ones(), 2);
+    }
+
+    #[test]
+    fn test_fen_to_position_conversion_2(){
+        let position = fen::load_from_fen("3r4/8/8/8/8/8/3R4/3K4 w - - 0 1".to_string());
+        assert_eq!(position.position_bitboard.count_ones(), 3);
+        assert_eq!(position.piece_collections[0].pieces.get(&'R').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[1].pieces.get(&'r').unwrap().bitboard.count_ones(), 1);
+        assert_eq!(position.piece_collections[0].pieces.get(&'K').unwrap().bitboard.count_ones(), 1);
     }
 }
