@@ -36,13 +36,3 @@ impl Zobrist{
         Zobrist { piece_keys, en_passant_keys, random_side, black_to_move }
     }
 }
-
-#[cfg(test)]
-mod zobrist_test{
-    
-    #[test]
-    fn print_zobrist_keys(){
-        //let zobrist = Zobrist::new();
-
-    }
-}

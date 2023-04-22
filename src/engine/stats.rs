@@ -54,8 +54,9 @@ impl MoveGenStats{
         let mut moves:Vec<&u32> = self.moves_per_depth.keys().collect();
         moves.sort();
         for depth in moves {
-            println!("Depth {}: {}", depth, self.moves_per_depth.get(depth).unwrap());
+            println!("\tDepth {}: {}", depth, self.moves_per_depth.get(depth).unwrap());
         }
+        println!("===========================");
     }
 
     pub fn update_move_type_count(&mut self,mv:&Move){

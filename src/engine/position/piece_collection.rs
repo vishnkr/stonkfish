@@ -2,7 +2,7 @@ use std::{collections::HashMap};
 
 use crate::engine::bitboard::Bitboard;
 
-use super::{Color, piece::{Piece, PieceRepr}, Dimensions};
+use super::{Color, piece::{Piece, PieceRepr}};
 
 
 #[derive(Debug,PartialEq)]
@@ -14,12 +14,8 @@ pub struct PieceCollection{
 }
 
 impl PieceCollection{
-    pub fn new(color:Color,dimensions:&Dimensions)->Self{
-        let standard_pieces = vec!['k','q','r','b','n','p'];
-        let mut pieces = HashMap::new();
-        for piece_repr in standard_pieces{
-            pieces.insert(piece_repr,Piece::new_piece(color, piece_repr, dimensions));
-        }
+    pub fn new(color:Color)->Self{
+        let pieces = HashMap::new();
         PieceCollection{
             player:color,
             pieces,
@@ -27,8 +23,12 @@ impl PieceCollection{
         }
     }
 
-    pub fn get_king_mut(&self)->&Piece{
-        self.pieces.get(&'k').unwrap()
+    pub fn get_king(&self)->&Piece{
+        let king_repr: char = match self.player{
+            Color::BLACK => 'k',
+            Color::WHITE => 'K',
+        };
+        self.pieces.get(&king_repr).unwrap()
     }
 
     pub fn get_mut_piece_from_sq(&mut self,loc:usize)->Option<&mut Piece>{
@@ -47,6 +47,10 @@ impl PieceCollection{
             }
         }
         None
+    }
+
+    pub fn has_piece_at(&self,loc:usize)->bool{
+        return self.occupied.bit(loc).unwrap();
     }
 
 }

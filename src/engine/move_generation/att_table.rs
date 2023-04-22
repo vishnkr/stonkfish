@@ -117,20 +117,6 @@ impl AttackTable{
         occupancy_lookup
     }
 
-    pub fn get_rank_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
-        let rank_attack = self.occupancy_lookup[file][occupancy];
-        let mut rank_attack_bb = Bitboard::zero();
-        rank_attack_bb |= rank_attack;
-        rank_attack_bb << rank
-    }   
-
-    pub fn get_file_slide_attacks(&self,rank:u16,file:usize,occupancy:usize)->Bitboard{
-        let rank_attack = self.occupancy_lookup[file][occupancy];
-        let mut rank_attack_bb = Bitboard::zero();
-        rank_attack_bb |= rank_attack;
-        rank_attack_bb << rank
-    }   
-
     pub fn get_file(&self,pos:u8)->Bitboard{
         let file = to_col(pos) as usize;
         self.files[file].to_owned()
@@ -175,32 +161,6 @@ impl AttackTable{
         let file_occupancy_as_rank = self.insert_rank_into_first_rank(self.get_file_occupancy_as_rank(occupancy, square));
         self.map_rank_to_first_file(&file_occupancy_as_rank,square) << col
     }
-
-    
-    /*pub fn get_bishop_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
-        let row = to_row(position);
-        let col = to_col(position);
-        // diagonal attack -> diagonal.get(pos) & occupancy ->convert diagonal to rank -> lookup occupancy -> convert rank to diagonal
-        let diagonal_as_rank = self.get_diagonal_occupancy_as_rank(occupancy, false, position);
-        let diagonal_attacks = &(Bitboard::zero() | diagonal_as_rank).overflowing_mul(&self.files[0]).0 & self.diagonals.get(&(col as i8 - row as i8)).unwrap();
-
-        let anti_diagonal_as_rank = self.get_diagonal_occupancy_as_rank(occupancy, true,position);
-        let anti_diagonal_attacks = &(Bitboard::zero() | anti_diagonal_as_rank).overflowing_mul(&self.files[0]).0 & self.anti_diagonals.get(&(col as i8 + row as i8)).unwrap();
-        
-        diagonal_attacks | anti_diagonal_attacks
-    }*/
-
-    /*pub fn get_rook_attacks(&self,position:u8,occupancy:&Bitboard)->Bitboard{
-        let row = to_row(position);
-        let col = to_col(position);
-        // file attacks
-        let file_occupancy_as_rank = self.insert_rank_into_first_rank(self.get_file_occupancy_as_rank(occupancy, position));
-        let file_occupancy_bitboard = self.map_rank_to_first_file(&file_occupancy_as_rank,position) << col;
-        // rank attacks
-        let rank_occupancy_bitboard = self.insert_rank_into_first_rank(self.get_rank_occupancy(occupancy, position).reverse_bits()) << (16*row);
-        &rank_occupancy_bitboard ^ &file_occupancy_bitboard 
-    }*/
-
     pub fn get_file_occupancy_as_rank(&self,occupancy:&Bitboard,pos:u8)->u16{
         let rank_map = self.map_file_to_first_rank(occupancy, pos);
         let row = to_row(pos);

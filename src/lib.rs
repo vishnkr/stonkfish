@@ -23,7 +23,7 @@ impl Engine{
     pub fn new(fen:String)->Engine{
         let position : Position = Position::new(fen);
         Engine{
-            move_generator: MoveGenerator::new(position.dimensions.clone(),Some(position.get_jump_offets())),
+            move_generator: MoveGenerator::new(position.dimensions.clone(),position.get_jump_offets()),
             evaluator: Evaluator {  },//Evaluator::new(&position),
             position: position,
             transposition_table: TranspositionTable::new(TEST_TT_SIZE),
@@ -41,8 +41,8 @@ impl Engine{
         let old_alpha = alpha;
 
         self.stats.search_stats.node_count+=1;
-
-        let in_check = self.move_generator.is_king_under_check(&mut self.position);
+        let turn = self.position.turn;
+        let in_check = self.move_generator.is_king_under_check(&mut self.position,turn);
         let mut legal_move_count = 0;
 
         let move_list = self.move_generator.generate_pseudolegal_moves(&mut self.position);
@@ -103,23 +103,44 @@ impl Engine{
             return 1;
         }
         let mut nodes = 0;
-        let moves = time_it!("Legal move generation",{ generate_legal_moves(&self.move_generator, &mut self.position) });
+        let moves = generate_legal_moves(&self.move_generator, &mut self.position);//time_it!("Legal move generation",{ generate_legal_moves(&self.move_generator, &mut self.position) });
         self.stats.move_gen_stats.moves_generated += moves.len();
-        println!("{}({})","---|".repeat(current_depth as usize),current_depth);
+        //println!("{}({})","---|".repeat(current_depth as usize),current_depth);
         for mv in moves{
             self.stats.move_gen_stats.update_move_type_count(&mv);
-            println!("{} - depth {}",mv.to_algebraic_notation(
+            /*println!("{} - depth {}",mv.to_algebraic_notation(
                 self.move_generator.dimensions.height,
                 self.position.turn,
                 &self.position.piece_collections[self.position.turn as usize]
-            ),depth);
+            ),depth);*/
             self.position.make_move(&mv);
             let count = self.perft(depth-1,current_depth+1);
             *self.stats.move_gen_stats.moves_per_depth.entry(current_depth).or_insert(0) += 1;
             nodes+=count;
             self.position.unmake_move(&mv);
         }
-        println!("{}({})","---|".repeat(current_depth as usize),current_depth);
+        //println!("{}({})","---|".repeat(current_depth as usize),current_depth);
         return nodes
+    }
+
+    pub fn perft_divide(&mut self, depth:u32)->u64{
+        let mut total = 0;
+        if depth == 0{
+            return 1;
+        }
+        let moves= generate_legal_moves(&self.move_generator, &mut self.position);
+        for mv in moves{
+            self.position.make_move(&mv);
+            let count = self.perft(depth-1,1);
+            self.position.unmake_move(&mv);
+            total+=count;
+            println!("{} - {}",mv.to_algebraic_notation(
+                self.move_generator.dimensions.height,
+                self.position.turn,
+                &self.position.piece_collections[self.position.turn as usize]
+            ),count);
+        }
+        println!("Found {} moves",total);
+        total
     }
 }

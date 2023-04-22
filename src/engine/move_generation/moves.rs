@@ -109,9 +109,12 @@ impl Move{
         let (src,dest,mtype) = (self.get_src_square(), self.get_dest_square(),self.get_mtype().unwrap());
         let piece = piece_collections.get_piece_from_sq(src.into()).unwrap();
         if piece.piece_type == PieceType::Pawn{
-            return format!("{}{}",
-            sq_to_notation(src,rows)
-            ,sq_to_notation(dest,rows));
+            match mtype{
+                MType::Quiet=>{ format!("{}{}",sq_to_notation(src,rows),sq_to_notation(dest,rows)) },
+                MType::Capture=>{format!("{}x{}",sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                _=> "".to_string()
+            }
+
         } else {
             let mut piece_type_str = piece.piece_repr.to_string();
             if color == Color::WHITE{ piece_type_str = piece_type_str.to_ascii_uppercase()}

@@ -7,8 +7,8 @@ pub const RADIX: u32 = 10;
 pub fn load_from_fen(fen:String) -> Position{
     let board_data:String = fen.split(" ").collect();
     let dimensions:Dimensions = get_dimensions(board_data.split("/").map(|s| s.to_string()).collect());
-    let mut white_piece_set:PieceCollection = PieceCollection::new(Color::WHITE,&dimensions);
-    let mut black_piece_set:PieceCollection = PieceCollection::new(Color::BLACK,&dimensions);
+    let mut white_piece_set:PieceCollection = PieceCollection::new(Color::WHITE);
+    let mut black_piece_set:PieceCollection = PieceCollection::new(Color::BLACK);
     let mut turn = Color::WHITE;
     let mut fen_part = 0;
     let mut sec_digit = 0;
@@ -46,7 +46,7 @@ pub fn load_from_fen(fen:String) -> Position{
                         }
                         false=>{
                             if !white_piece_set.pieces.contains_key(&c){
-                                white_piece_set.pieces.insert(c, Piece::new_piece(Color::WHITE,c,&dimensions));
+                                white_piece_set.pieces.insert(c, Piece::new_piece(Color::WHITE,c.to_ascii_uppercase(),&dimensions));
                             }
                             &mut white_piece_set.pieces.get_mut(&c).unwrap().bitboard
                         }

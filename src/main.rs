@@ -33,13 +33,30 @@ mod engine_tests{
     use stonkfish::{Engine,time_it};
     #[test]
     pub fn test_perft(){
-        //expected - 1: 20, 2: 400, 3: 8907, 4: 197281, 5: 4865609
+        /*expected ( nodes, total_nodes) :
+            1: 20, 20 
+            2: 400, 420
+            3: 8902, 9322 
+            4: 197281, 206603
+            5: 4865609, 5072212,
+            6: 119060324, 124132536
+            7: 3195901860, 3320034396
+        */
         //rnbqkbnr/pppppppp/8/5p2/4P3/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-        let depth = 2;
-        
-        let mut engine = Engine::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".to_string());
+        //"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR" "3r1k2/8/8/8/8/8/3R4/3K4 w - - 0 1"
+        let depth = 3;
+        let fen = "r3k3/8/8/8/8/8/8/4K3 w q - 0 1";
+        let mut engine = Engine::new(fen.to_string());
         
         println!("Generated {} moves at depth {}, Color {:#?}",time_it!("perft",{engine.perft(depth,1)}),depth, engine.position.turn);
-        time_it!("print",{engine.stats.move_gen_stats.display_stats()});
+        engine.stats.move_gen_stats.display_stats();
+    }
+
+    #[test]
+    pub fn test_perft_divide(){
+        let depth = 3;
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let mut engine = Engine::new(fen.to_string());
+        engine.perft_divide(depth);
     }
 }

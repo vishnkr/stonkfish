@@ -53,14 +53,16 @@ impl Piece{
 
 #[derive(Clone,Debug,PartialEq,Eq,Default)]
 pub struct PieceProps{
-    pub jump_offsets:Vec<(i8,i8)>,
+    // jump moves that can capture and move
+    pub jump_offsets:Vec<(i8,i8)>, 
     pub slide_directions:Vec<(i8,i8)>,
     
     pub can_double_jump: bool,
     // squares from which a piece can perform a non capture double jump move  using any of the jump offset definitions (ex: pawn double jump from starting pos)
     pub double_jump_squares: Option<HashSet<u8>>,
     // similar to jump except a piece can only mnove to the target if its a capture move
-    pub capture_only_offsets: Vec<(i8,i8)>,
+    pub capture_only_jump_offsets: Vec<(i8,i8)>,
+    pub non_capture_only_jump_offsets: Vec<(i8,i8)>,
     pub can_promote: bool,
     pub promotion_squares: Option<Vec<(i8,i8)>>,
 
@@ -76,7 +78,8 @@ impl PieceProps{
             slide_directions: vec![],
             can_double_jump: false,
             double_jump_squares: Some(HashSet::new()),
-            capture_only_offsets: vec![],
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![],
             can_promote: false,
             promotion_squares: None ,
             can_en_passant: false 
@@ -91,7 +94,7 @@ impl PieceProps{
         let capture_rank_dir: i8;
         match color{
             Color::BLACK=>{
-                double_jump_rank = 1;//(dimensions.height-2);
+                double_jump_rank = 1;
                 promotion_rank = (dimensions.height-1) as i8;
                 capture_rank_dir = 1;
             },
@@ -107,11 +110,12 @@ impl PieceProps{
         }
 
         PieceProps { 
-            jump_offsets: vec![(capture_rank_dir,0)], 
+            jump_offsets: vec![], 
             slide_directions: vec![], 
             can_double_jump: true, 
             double_jump_squares: Some(double_jump_squares), 
-            capture_only_offsets: vec![(capture_rank_dir,-1),(capture_rank_dir,1)], 
+            capture_only_jump_offsets: vec![(capture_rank_dir,-1),(capture_rank_dir,1)],
+            non_capture_only_jump_offsets: vec![(capture_rank_dir,0)], 
             can_promote: true ,
             promotion_squares:Some(promotion_squares), 
             can_en_passant: true,
@@ -124,7 +128,8 @@ impl PieceProps{
             slide_directions: vec![(-1,-1),(1,1),(-1,1),(1,-1)], 
             can_double_jump: false, 
             double_jump_squares: None, 
-            capture_only_offsets: vec![], 
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![], 
             can_promote: false, 
             promotion_squares: None, 
             can_en_passant: false
@@ -137,7 +142,8 @@ impl PieceProps{
             slide_directions: vec![(-1,0),(1,0),(0,1),(0,-1)], 
             can_double_jump: false, 
             double_jump_squares: None, 
-            capture_only_offsets: vec![], 
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![],
             can_promote: false, 
             promotion_squares: None, 
             can_en_passant: false
@@ -150,7 +156,8 @@ impl PieceProps{
             slide_directions: vec![(-1,0),(1,0),(0,1),(0,-1),(-1,-1),(1,1),(-1,1),(1,-1)], 
             can_double_jump: false, 
             double_jump_squares: None, 
-            capture_only_offsets: vec![], 
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![],
             can_promote: false, 
             promotion_squares: None, 
             can_en_passant: false
@@ -163,7 +170,8 @@ impl PieceProps{
             slide_directions: vec![], 
             can_double_jump: false, 
             double_jump_squares: None, 
-            capture_only_offsets: vec![], 
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![],
             can_promote: false, 
             promotion_squares: None, 
             can_en_passant: false
@@ -175,7 +183,8 @@ impl PieceProps{
             slide_directions: vec![], 
             can_double_jump: false, 
             double_jump_squares: None, 
-            capture_only_offsets: vec![], 
+            capture_only_jump_offsets: vec![],
+            non_capture_only_jump_offsets: vec![],
             can_promote: false, 
             promotion_squares: None, 
             can_en_passant: false

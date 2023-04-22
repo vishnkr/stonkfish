@@ -9,6 +9,12 @@ pub fn to_pos(x:u8,y:u8) -> usize{
     ((x*16)+y).into()
 }
 
+pub fn add_u8_i8(x:u8,y:i8)->Option<u8>{
+    let res = x as i16 + y as i16;
+    if res<0 { return None}
+    Some(res  as u8)
+}
+
 pub fn to_col(pos:u8)->u8{
     pos%16
 }
