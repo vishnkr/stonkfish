@@ -75,7 +75,6 @@ impl Bucket{
 
 pub struct TranspositionTable{
     buckets: Vec<Bucket>,
-    size: usize,
 }
 
 impl TranspositionTable{
@@ -83,7 +82,6 @@ impl TranspositionTable{
         let num_buckets = (size)/ENTRIES_PER_BUCKET;
         Self{
             buckets: vec![Bucket::new(); num_buckets],
-            size
         }
     }
 

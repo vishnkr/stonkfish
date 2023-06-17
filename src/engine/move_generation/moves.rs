@@ -1,6 +1,6 @@
 
-use std::{fmt::{self, write}};
-use crate::engine::{bitboard::*, position::{piece::PieceType}};
+use std::{fmt, convert::TryInto};
+use crate::engine::{bitboard::*, position::{piece::{PieceType}, Color, piece_collection::PieceCollection}};
 
 #[derive(PartialEq,Copy,Clone)]
 pub struct Move(u32);
@@ -104,30 +104,42 @@ impl Move{
             _ => Some(MType::None)
         }
     }
+
+    pub fn to_algebraic_notation(&self,rows:u8,color:Color, piece_collections: &PieceCollection)->String{
+        let (src,dest,mtype) = (self.get_src_square(), self.get_dest_square(),self.get_mtype().unwrap());
+        let piece = piece_collections.get_piece_from_sq(src.into()).unwrap();
+        if piece.piece_type == PieceType::Pawn{
+            match mtype{
+                MType::Quiet=>{ format!("{}{}",sq_to_notation(src,rows),sq_to_notation(dest,rows)) },
+                MType::Capture=>{format!("{}x{}",sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                _=> "".to_string()
+            }
+
+        } else {
+            let mut piece_type_str = piece.piece_repr.to_string();
+            if color == Color::WHITE{ piece_type_str = piece_type_str.to_ascii_uppercase()}
+            match mtype{
+                MType::Quiet=>{ format!("{}{}{}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows)) },
+                MType::KingsideCastle => "O-O".to_string(),
+                MType::QueensideCastle => "O-O-O".to_string(),
+                MType::Capture=>{format!("{}{}x{}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                //capture promos will be formated as promo for now
+                MType::Promote =>{format!("{}{}={}",piece_type_str,sq_to_notation(src,rows),sq_to_notation(dest,rows))},
+                _=> "".to_string()
+            }
+        }
+    }
 }
 
-// contains bitboard with all possible moves for a piece which can be iterated to get a list of moves
-pub struct MoveMask{
-    pub bitboard: Bitboard,
-    pub src: u8,
-    pub piece_type: PieceType,
-    pub opponent:Bitboard
-}
-
-impl Iterator for MoveMask{
-    type Item = Move;
-
-    fn next(&mut self)->Option<Self::Item>{
-        let dest_pos = match self.bitboard.lowest_one(){
-            Some(x) => x,
-            None=> return None
-        };
-        self.bitboard.set_bit(dest_pos,false);
+pub fn flatten_bitboard(bitboard:&mut Bitboard,moves:&mut Vec<Move>,opponent_bb:&Bitboard,_piece_type:PieceType,src:u8){
+    while !bitboard.is_zero(){
+        let dest = bitboard.lowest_one().unwrap();
+        bitboard.set_bit(dest, false);
         let mut mtype = MType::Quiet;
-        if self.opponent.bit(dest_pos).unwrap(){
+        if opponent_bb.bit(dest).unwrap(){
             mtype = MType::Capture;
         }
-        Some(Move::encode_move(self.src, dest_pos as u8, mtype, None))
+        moves.push(Move::encode_move(src, dest.try_into().unwrap(), mtype, None));
     }
 }
 
@@ -150,7 +162,6 @@ impl fmt::Display for Move{
     fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
         let mtype = self.get_mtype().unwrap().to_string();
         let dest_pos = self.get_dest_square();
-        let src_pos = self.get_src_square();
         let src_pos = self.get_src_square();
         let src_coords = (to_row(src_pos as u8),to_col(src_pos as u8));
         let dest_coords = (to_row(dest_pos as u8),to_col(dest_pos as u8));

@@ -1,3 +1,4 @@
+ /*
 use arrayvec::ArrayVec;
 use crate::engine::{bitboard::{to_pos, to_row, to_col},position::{*, piece::PieceType}};
 use std::iter::repeat;
@@ -14,8 +15,8 @@ pub struct PieceSquareTables{
 
 }
 
-impl PieceSquareTables{
-    
+impl PieceSquareTables{}
+   
     pub fn new(start_pos: &Position)->Self{
         let rook_psqt = Self::setup_piece_sq_table(&start_pos.dimensions,PieceType::Rook);
         let pawn_psqt = Self::setup_pawn_pqst(start_pos); 
@@ -29,7 +30,7 @@ impl PieceSquareTables{
         }
     }
 
-    pub fn setup_pawn_pqst(start_pos:&Position)->PieceSquareTable{
+    /pub fn setup_pawn_pqst(start_pos:&Position)->PieceSquareTable{
         let width = start_pos.dimensions.width;
         let height = start_pos.dimensions.height;
         let mut pqst:PieceSquareTable = repeat(0).take(256).collect();
@@ -128,4 +129,4 @@ mod psqt_tests{
         let psqt =  PieceSquareTables::setup_pawn_pqst(&position); 
         //display_piece_sq_table(&psqt, &position.dimensions)
     }
-}
+}*/

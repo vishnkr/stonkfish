@@ -1,36 +1,35 @@
 mod piece_sq;
 
-use std::collections::HashMap;
-use arrayvec::ArrayVec;
-pub use crate::engine::position::{Position,piece::PieceSet,piece::PieceType};
+pub use crate::engine::position::{Position};
 pub use crate::engine::move_generation::att_table::SlideDirection;
 
-use self::piece_sq::PieceSquareTables;
+
 //centipawn scores
-const KING_CP_SCORE:isize = 10000;
+const _KING_CP_SCORE:isize = 10000;
 pub const PAWN_CP_SCORE:isize = 100;
-const KNIGHT_CP_SCORE:isize = 300;
-const BISHOP_CP_SCORE:isize = 350;
-const ROOK_CP_SCORE:isize = 500;
-const QUEEN_CP_SCORE:isize = 900;
-const DIAGONAL_SCORE:isize = 90;
+const _KNIGHT_CP_SCORE:isize = 300;
+const _BISHOP_CP_SCORE:isize = 350;
+const _ROOK_CP_SCORE:isize = 500;
+const _QUEEN_CP_SCORE:isize = 900;
+const _DIAGONAL_SCORE:isize = 90;
 
 pub struct Evaluator{
-    piece_sq_table: PieceSquareTables
+    //piece_sq_table: PieceSquareTables
 }
 
 impl Evaluator{
-    pub fn new(position: &Position)->Self{
-        Evaluator{piece_sq_table: PieceSquareTables::new(position)}
+    pub fn new()->Self{
+        //Evaluator{piece_sq_table: PieceSquareTables::new(position)}
+        Evaluator { }//piece_sq_table: () }
     }
-
-    pub fn evaluate(&mut self,position:&mut Position)->isize{
+    pub fn evaluate()->usize{ 0 }
+    //pub fn evaluate(&mut self,position:&mut Position)->isize{
         //TODO: add positional eval score
-        self.get_material_eval_score(position)
-    }
-
-    pub fn calc_material_score(&mut self,piece_set: &PieceSet)->isize{
-        let material_score = piece_set.king.bitboard.count_ones() as isize * KING_CP_SCORE + 
+       // self.get_material_eval_score(position)
+    //}
+    /* 
+    pub fn calc_material_score(&mut self,piece_set: &PieceCollection)->isize{
+        let material_score = 0;piece_set.king.bitboard.count_ones() as isize * KING_CP_SCORE + 
         piece_set.pawn.bitboard.count_ones() as isize * PAWN_CP_SCORE + 
         piece_set.queen.bitboard.count_ones() as isize * QUEEN_CP_SCORE + 
         piece_set.rook.bitboard.count_ones() as isize * ROOK_CP_SCORE + 
@@ -41,10 +40,10 @@ impl Evaluator{
 
     pub fn get_material_eval_score(&mut self,position:&mut Position)->isize{
         let mut total_score = 0;
-        for piece_set in position.pieces.iter(){
-            println!("ts {}",self.calc_material_score(piece_set));
-            if position.turn as u8 ==piece_set.player { total_score += self.calc_material_score(piece_set);}
-            else { total_score -= self.calc_material_score(piece_set);}
+        for pieces in position.piece_collections{
+            println!("ts {}",self.calc_material_score(&pieces));
+            if position.turn ==pieces.player { total_score += self.calc_material_score(&pieces);}
+            else { total_score -= self.calc_material_score(&pieces);}
         }
         total_score
     }
@@ -55,5 +54,5 @@ impl Evaluator{
     )->isize{
         let material_score = 0;
         material_score
-    }
+    }*/
 }
