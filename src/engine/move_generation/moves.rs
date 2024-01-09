@@ -15,6 +15,7 @@ pub enum MType{
     // refers to castling on the left
     QueensideCastle,
     EnPassant,
+    PromotionCapture,
     None
 }
 
@@ -32,6 +33,7 @@ impl fmt::Display for MType{
             MType::KingsideCastle => write!(f, "KS Castle"),
             MType::QueensideCastle => write!(f, "QS Castle"),
             MType::EnPassant => write!(f, "En Passant"),
+            MType::PromotionCapture => write!(f, "Promotion Capture"),
             MType::None => write!(f, "Invalid move"),
         }
     }
@@ -46,6 +48,7 @@ impl fmt::Debug for MType{
             MType::KingsideCastle => write!(f, "KS Castle"),
             MType::QueensideCastle => write!(f, "QS Castle"),
             MType::EnPassant => write!(f, "En Passant"),
+            MType::PromotionCapture => write!(f, "Promotion Capture"),
             MType::None => write!(f, "Invalid move"),
         }
     }
@@ -64,7 +67,8 @@ impl Move{
                 MType::KingsideCastle => 3u32,
                 MType::QueensideCastle => 4u32,
                 MType::EnPassant => 5u32,
-                MType::None => 6u32
+                MType::PromotionCapture => 6u32,
+                MType::None => 7u32
             };
             if let Some(additional_info) = additional_info {
                 match additional_info {

@@ -67,7 +67,7 @@ pub struct Position{
     pub castling_rights: u8,
     pub has_king_moved: bool,
     // idx-0 : capturing piece, idx-1 : captured piece
-    pub recent_capture: Option<(PieceRepr,PieceRepr)>,
+    pub recent_capture: Option<PieceRepr>,
     pub position_bitboard: Bitboard,
     pub zobrist_hash: Zobrist,
 }
@@ -144,15 +144,14 @@ impl Position{
             },
             MType::Capture =>{
                 let opponent_color =!self.turn;
-                let capturing_piece = self.piece_collections[self.turn as usize].get_piece_from_sq(src).unwrap();
                 let captured_piece = self.piece_collections[opponent_color as usize].get_piece_from_sq(dest).unwrap();
-                self.recent_capture = Some((capturing_piece.piece_repr,captured_piece.piece_repr));
+                self.recent_capture = Some(captured_piece.piece_repr);
                 self.remove_piece_from(opponent_color,dest);
                 self.move_piece(self.turn,(src,dest));
             },
             MType::Promote =>{},
             MType::EnPassant =>{},
-            MType::None => {},
+            _ => {},
         }
         self.turn = !self.turn;
         self.update_occupied_bitboard();
@@ -172,30 +171,47 @@ impl Position{
             MType::KingsideCastle => {},
             MType::QueensideCastle => {},
             MType::Capture =>{
-                let (_,captured_piece) = self.recent_capture.unwrap();
+                let captured_piece = self.recent_capture.unwrap();
+                //println!("tryna move from {} to {}",dest,src);
                 self.move_piece(my_color,(dest,src));
                 self.add_piece_at(!my_color, dest, captured_piece);
             },
             MType::Promote =>{},
             MType::EnPassant =>{},
-            MType::None=>{}
+            _=>{}
         }
         self.update_occupied_bitboard();
         
     }
 
+    pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
+        let (src,dest) = from_to;
+        if self.piece_collections[color as usize].has_piece_at(src){
+            let piece_repr = self.piece_collections[color as usize].get_piece_from_sq(src).unwrap().piece_repr;
+            /*let piece:&mut Piece =self.piece_collections[color as usize].get_mut_piece_from_sq(src).unwrap();
+            self.position_bitboard.set_bit(src,false);
+            self.position_bitboard.set_bit(dest,true);
+            piece.bitboard.set_bit(src,false);
+            piece.bitboard.set_bit(dest,true);*/
+            self.remove_piece_from(color, src);
+            self.add_piece_at(color, dest, piece_repr);
+            //println!("moved piece  {} from {} to {}",piece_repr,src,dest);
+        }
+    }
     pub fn remove_piece_from(&mut self,color:Color,sq:usize){
         if let Some(piece) = self.piece_collections[color as usize].get_mut_piece_from_sq(sq){
             self.position_bitboard.set_bit(sq,false);
             piece.bitboard.set_bit(sq,false);
+            self.piece_collections[color as usize].occupied.set_bit(sq,false);
         } else { println!("error removing piece at sq - {}",sq)}
     }
 
     pub fn add_piece_at(&mut self, color:Color, sq:usize, piece_repr: PieceRepr){
+        
         if let Some(piece) = self.piece_collections[color as usize].pieces.get_mut(&piece_repr){
             piece.bitboard.set_bit(sq,true);
             self.position_bitboard.set_bit(sq,true);
-        } else { println!("error adding piece at sq - {}",sq)}
+        } else { panic!("error adding {} piece at sq - {}",piece_repr,sq) }
     }
 
     pub fn update_occupied_bitboard(&mut self){
@@ -209,16 +225,7 @@ impl Position{
         }
     }
 
-    pub fn move_piece(&mut self,color:Color,from_to:(usize,usize)){
-        let (src,dest) = from_to;
-        if self.piece_collections[color as usize].has_piece_at(src){
-            let piece:&mut Piece = self.piece_collections[color as usize].get_mut_piece_from_sq(src).unwrap();
-            self.position_bitboard.set_bit(src,false);
-            self.position_bitboard.set_bit(dest,true);
-            piece.bitboard.set_bit(src,false);
-            piece.bitboard.set_bit(dest,true);
-        }
-    }
+    
 
     pub fn get_zobrist_hash(&self)-> u64{
         let mut zobrist_hash_key = 0u64;
