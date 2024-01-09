@@ -1,7 +1,7 @@
 
 pub mod engine;
 pub mod chesscore;
-use chesscore::{Variant, DefaultVariant};
+use chesscore::{VariantActions, DefaultVariant, load_config, Variant};
 use engine::{
     move_generation::{MoveGenerator,moves::*, generate_legal_moves},
     evaluation::{Evaluator},
@@ -19,12 +19,13 @@ pub struct Engine{
 }
 
 pub struct ChessCore{
-    pub variant:  Box<dyn Variant>
+    pub variant: Variant
 }
 
 impl ChessCore{
-    pub fn new(/*variant: Box<dyn Variant>*/) -> Self {
-        ChessCore { variant: Box::new(DefaultVariant::new()) }
+    pub fn new(config:String) -> Self {
+        let game_config = load_config(config);
+        ChessCore { variant : game_config.unwrap() }
     }
 }
 
