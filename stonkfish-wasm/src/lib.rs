@@ -1,4 +1,4 @@
-use stonkfish::{chesscore::{load_config, Move}, ChessCore, engine, Engine};
+use stonkfish::{chesscore::{Move, Color,VariantActions}, ChessCore, engine, Engine};
 use wasm_bindgen::prelude::*;
 use serde::Serialize;
 
@@ -21,12 +21,6 @@ pub struct Stonkfish{
     engine: stonkfish::Engine,
 }
 
-#[wasm_bindgen]
-pub struct ChessCoreLib{
-    chesscore: stonkfish::ChessCore
-}
-
-
 #[derive(Serialize,Debug)]
 struct EngineMoveJSON{
     src: u8,
@@ -34,29 +28,40 @@ struct EngineMoveJSON{
     mtype: String,
 }
 
+
+#[wasm_bindgen]
+pub struct ChessCoreLib{
+    chesscore: stonkfish::ChessCore
+}
+
 #[wasm_bindgen]
 impl ChessCoreLib{
     #[allow(clippy::inherent_to_string)]
     #[wasm_bindgen(constructor)]
-    pub fn new(game_config: JsValue)->Self{
-        let config: String = serde_wasm_bindgen::from_value(game_config).unwrap();
+    pub fn new(config: String)->Self{
         ChessCoreLib { chesscore: ChessCore::new(config)}
     }
 
     #[wasm_bindgen(js_name= getLegalMoves)]
-    pub fn get_legal_moves(&self)->JsValue{
-        serde_wasm_bindgen::to_value(&self.chesscore.variant.get_legal_moves()).unwrap()
+    pub fn get_legal_moves(&mut self)->JsValue{
+        let moves = &self.chesscore.variant.get_legal_moves();
+        serde_wasm_bindgen::to_value(&moves).unwrap()
     }
 
-    #[wasm_bindgen(js_name= makeMove)]
+    #[wasm_bindgen(js_name= getPseudoLegalMoves)]
+    pub fn get_pseudo_legal_moves(&self)->JsValue{
+        let moves = &self.chesscore.variant.get_pseudo_legal_moves(Color::WHITE);
+        serde_wasm_bindgen::to_value(&moves).unwrap()
+    }
+
+    /*#[wasm_bindgen(js_name= makeMove)]
     pub fn make_move(&mut self,mv:JsValue)->JsValue{
        let val:Result<Move, serde_wasm_bindgen::Error> = serde_wasm_bindgen::from_value(mv);
        match val{
         Ok(mov) => serde_wasm_bindgen::to_value(&self.chesscore.variant.make_move(mov)).unwrap(),
         Err(e) => serde_wasm_bindgen::to_value(&e.to_string()).unwrap()
        }
-        
-    }
+    }*/
 
 }
 

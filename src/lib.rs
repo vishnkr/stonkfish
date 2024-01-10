@@ -24,8 +24,8 @@ pub struct ChessCore{
 
 impl ChessCore{
     pub fn new(config:String) -> Self {
-        let game_config = load_config(config);
-        ChessCore { variant : game_config.unwrap() }
+        let variant = serde_json::from_str(&config).unwrap();
+        ChessCore { variant }
     }
 }
 
