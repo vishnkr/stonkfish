@@ -84,8 +84,6 @@ impl Position{
         let is_standard_piece = |k:char|->bool{ standard_piece_map.contains_key(&k)} ;
         let mut fen_part = 0;
         let mut sec_digit = 0;
-        let mut col = 0;
-        let mut row = 0;
         let mut count;
         let mut castling_rights:u8 = 0;
         let mut id  = 0;
@@ -98,7 +96,6 @@ impl Position{
             match fen_part{
                 0=>{
                     if c=='/'{
-                        row+=1;
                         sec_digit = 0;
                         continue;
                     } else if c.is_digit(10){
@@ -174,7 +171,7 @@ impl Position{
         let row = self.add_delta_row(row_col.0, offset.0)?;  
         let col = self.add_delta_col(row_col.1, offset.1)?; 
         let target = self.to_pos(&row, &col);
-        if target<0 || target > (self.dimensions.ranks * self.dimensions.files){
+        if target > (self.dimensions.ranks * self.dimensions.files){
             return Err(false);
         }
         Ok(target)
@@ -185,7 +182,7 @@ impl Position{
     }
 
     pub fn add_delta_row(&self,pos: u32, delta: Delta) -> Result<u32, bool> {
-        let result = (pos as isize + delta);
+        let result = pos as isize + delta;
         if result<0 || result as u32>= self.dimensions.ranks{
             return Err(false);
         }
@@ -193,7 +190,7 @@ impl Position{
     }
 
     pub fn add_delta_col(&self,pos: u32, delta: Delta) -> Result<u32, bool> {
-        let result = (pos as isize + delta);
+        let result = pos as isize + delta;
         if result<0 || result as u32>= self.dimensions.files{
             return Err(false);
         }

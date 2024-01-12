@@ -222,6 +222,7 @@ pub trait VariantActions {
     fn get_pseudo_legal_moves(&self, color: Color) -> Vec<Move>;
     fn get_legal_moves(&mut self) -> Vec<Move>;
     fn is_game_over(&self) -> Option<GameResult>;
+    fn is_legal_move(&mut self, mv:&Move)->bool;
 }
 
 impl VariantActions for Variant{
@@ -263,6 +264,14 @@ impl VariantActions for Variant{
             Variant::AntiChess(antichess_variant) =>  antichess_variant.is_game_over(),
             Variant::NCheck(ncheck_variant) => ncheck_variant.is_game_over(),
             _=> None,
+        }
+    }
+    fn is_legal_move(&mut self, mv:&Move)->bool{
+        match self{
+            Variant::Checkmate(checkmate_variant)=> checkmate_variant.is_legal_move(mv),
+            Variant::AntiChess(antichess_variant) =>  antichess_variant.is_legal_move(mv),
+            Variant::NCheck(ncheck_variant) => ncheck_variant.is_legal_move(mv),
+            _=> false,
         }
     }
 }
@@ -449,6 +458,9 @@ impl VariantActions for DefaultVariant{
     fn is_game_over(&self) -> Option<GameResult>{
         self.game_result.clone()
     }
+    fn is_legal_move(&mut self,mv:&Move)->bool{
+        true
+    }
 }
 
 impl DefaultVariant{
@@ -505,7 +517,7 @@ impl DefaultVariant{
         for row_delta in -1..=1{
             for col_delta in -1..=1{
                 if row_delta==0 && col_delta==0{ continue;}
-                if let Some(mut target) = self.get_target(sq, &(row_delta,col_delta)){
+                if let Some(target) = self.get_target(sq, &(row_delta,col_delta)){
                     if self.position.is_sq_empty(&target){
                         moves.push(Move { src: *sq, dest: target, classic_move_type: ClassicMoveType::Quiet, variant_move_type: None, piece:piece.clone() });
                     } else if let Some(occ) = self.position.piece_locations.get(&target){
@@ -649,6 +661,9 @@ impl CheckmateVariant{
     pub fn is_game_over(&self) -> Option<GameResult> {
         self.variant.is_game_over()
     }
+    pub fn is_legal_move(&mut self,mv:&Move)->bool{
+        self.variant.is_legal_move(mv)
+    }
 }
 
 #[derive(Debug)]
@@ -662,14 +677,14 @@ impl AntichessVariant{
             variant: DefaultVariant::new(config)
         }
     }
-    fn make_move(&mut self, mv: &Move)->bool {
+    pub fn make_move(&mut self, mv: &Move)->bool {
         self.variant.make_move(mv)
     }
-    fn unmake_move(&mut self, mv: &Move)->bool {
+    pub fn unmake_move(&mut self, mv: &Move)->bool {
         self.variant.unmake_move(mv)
     }
 
-    fn get_legal_moves(&mut self) -> Vec<Move> {
+    pub fn get_legal_moves(&mut self) -> Vec<Move> {
         let pseudo_moves = self.variant.get_pseudo_legal_moves(self.variant.position.turn);
         let capture_moves:Vec<Move> = pseudo_moves
         .iter().cloned()
@@ -680,11 +695,14 @@ impl AntichessVariant{
         pseudo_moves
     }
 
-    fn get_pseudo_legal_moves(&self, color: Color) -> Vec<Move> {
+    pub fn get_pseudo_legal_moves(&self, color: Color) -> Vec<Move> {
         self.variant.get_pseudo_legal_moves(color)
     }
-    fn is_game_over(&self) -> Option<GameResult> {
+    pub fn is_game_over(&self) -> Option<GameResult> {
         self.variant.is_game_over()
+    }
+    pub fn is_legal_move(&mut self,mv:&Move)->bool{
+        self.variant.is_legal_move(mv)
     }
 
 }
@@ -702,20 +720,23 @@ impl NCheckVariant{
             n: 3
         }
     }
-    fn make_move(&mut self, mv: &Move)->bool {
+    pub fn make_move(&mut self, mv: &Move)->bool {
         self.variant.make_move(mv)
     }
-    fn unmake_move(&mut self, mv: &Move)->bool {
+    pub fn unmake_move(&mut self, mv: &Move)->bool {
         self.variant.unmake_move(mv)
     }
-    fn get_legal_moves(&mut self) -> Vec<Move> {
+    pub fn get_legal_moves(&mut self) -> Vec<Move> {
         self.variant.get_legal_moves()
     }
-    fn get_pseudo_legal_moves(&self, color: Color) -> Vec<Move> {
+    pub fn get_pseudo_legal_moves(&self, color: Color) -> Vec<Move> {
         self.variant.get_pseudo_legal_moves(color)
     }
-    fn is_game_over(&self) -> Option<GameResult> {
+    pub fn is_game_over(&self) -> Option<GameResult> {
         self.variant.is_game_over()
+    }
+    pub fn is_legal_move(&mut self,mv:&Move)->bool{
+        self.variant.is_legal_move(mv)
     }
 }
 
@@ -724,14 +745,14 @@ impl NCheckVariant{
 mod chesscore_test{
     use serde_json::json;
 
-    use crate::chesscore::{Variant, VariantActions,Color};
+    use crate::chesscore::{Variant, VariantActions};
     #[test]
     pub fn setup_variant(){
         let json = json!({
             "variant_type":"Checkmate",  
-            "fen":"R3k3/8/8/8/8/8/8/R3K3 b - - 0 1",
+            "fen":"r3k3/8/8/8/4G3/8/8/4K3 w - - 0 1",
             "dimensions": { "ranks":8, "files":8},
-            "piece_props":{}
+            "piece_props":{"g":{"slide_directions":[(1,0),(-1,0)],"jump_offsets":[]}}
         });
         println!("{:?}",json);
         let mut result:Variant = serde_json::from_value(json).unwrap();

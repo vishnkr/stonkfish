@@ -1,20 +1,30 @@
+
+extern crate cfg_if;
 use stonkfish::{chesscore::{Move, Color,VariantActions}, ChessCore, engine, Engine};
 use wasm_bindgen::prelude::*;
+use cfg_if::cfg_if;
+
+
 use serde::Serialize;
 
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+cfg_if! {
+    if #[cfg(feature = "wee_alloc")] {
+        extern crate wee_alloc;
+        #[global_allocator]
+        static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    }
+}
 
 #[wasm_bindgen]
-extern {
-    pub fn alert(s: &str);
+extern "C" {
+    fn alert(s: &str);
 }
 
 #[wasm_bindgen]
 pub fn greet(name: &str) {
-    alert(&format!("Hello {}, welcome to stonkfish wasm",name));
+    alert(&format!("stonkfish wasm loaded,{}!", name));
 }
+
 
 #[wasm_bindgen]
 pub struct Stonkfish{
@@ -53,16 +63,6 @@ impl ChessCoreLib{
         let moves = &self.chesscore.variant.get_pseudo_legal_moves(Color::WHITE);
         serde_wasm_bindgen::to_value(&moves).unwrap()
     }
-
-    /*#[wasm_bindgen(js_name= makeMove)]
-    pub fn make_move(&mut self,mv:JsValue)->JsValue{
-       let val:Result<Move, serde_wasm_bindgen::Error> = serde_wasm_bindgen::from_value(mv);
-       match val{
-        Ok(mov) => serde_wasm_bindgen::to_value(&self.chesscore.variant.make_move(mov)).unwrap(),
-        Err(e) => serde_wasm_bindgen::to_value(&e.to_string()).unwrap()
-       }
-    }*/
-
 }
 
 #[wasm_bindgen]
