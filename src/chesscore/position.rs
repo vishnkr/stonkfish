@@ -44,7 +44,12 @@ impl Position{
         let mut position = Position::new();
         position.load_from_fen(config.fen);
         position.dimensions = config.dimensions;
-        position.piece_props.extend(config.piece_props.unwrap().into_iter());
+        match config.piece_props{
+            Some(props) => {
+                position.piece_props.extend(props.into_iter());
+            },
+            None => {}
+        }
         Ok(position)
     }
 
