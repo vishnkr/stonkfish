@@ -57,7 +57,9 @@ pub type Notation = char;
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Hash, Serialize, Deserialize)]
 pub enum Color {
+    #[serde(rename = "white")]
     WHITE,
+    #[serde(rename = "black")]
     BLACK,
 }
 
@@ -65,6 +67,7 @@ pub type Square = u32;
 pub type Delta = isize;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PieceProps {
     pub jump_offsets: Vec<(Delta, Delta)>,
     pub slide_directions: Vec<(Delta, Delta)>,
@@ -95,6 +98,7 @@ impl PieceProps {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Piece {
     pub piece_type: PieceType,
     pub notation: Notation,
@@ -118,6 +122,7 @@ pub struct Dimensions {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AdditionalProps {
     king_capture_allowed: bool,
     black_king_moved: bool,
@@ -127,6 +132,7 @@ pub struct AdditionalProps {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PromotionProps {
     white_promotion_squares: HashMap<Square, bool>,
     black_promotion_squares: HashMap<Square, bool>,
@@ -168,6 +174,7 @@ pub enum GameResult {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Move {
     src: Square,
     dest: Square,
