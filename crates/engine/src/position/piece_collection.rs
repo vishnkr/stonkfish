@@ -1,6 +1,6 @@
 use std::{collections::HashMap};
 
-use crate::engine::bitboard::Bitboard;
+use crate::bitboard::Bitboard;
 
 use super::{Color, piece::{Piece, PieceRepr}};
 

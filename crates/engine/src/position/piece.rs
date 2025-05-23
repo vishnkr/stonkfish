@@ -1,5 +1,5 @@
 use std::{collections::{HashSet}, convert::TryInto};
-use crate::{engine::{bitboard::{Bitboard, to_pos}}};
+use crate::{bitboard::{Bitboard, to_pos}};
 use super::{Color, Dimensions};
 
 

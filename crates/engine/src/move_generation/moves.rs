@@ -1,6 +1,6 @@
 
 use std::{fmt, convert::TryInto};
-use crate::engine::{bitboard::*, position::{piece::{PieceType}, Color, piece_collection::PieceCollection}};
+use crate::{bitboard::*, position::{piece::{PieceType}, Color, piece_collection::PieceCollection}};
 
 #[derive(PartialEq,Copy,Clone)]
 pub struct Move(u32);

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value};
+
 use std::{collections::HashMap, vec};
 
 use self::position::Position;
@@ -805,11 +806,13 @@ impl AntichessVariant {
         let pseudo_moves = self
             .variant
             .get_pseudo_legal_moves(self.variant.position.turn);
+        //log::info!("anti {:?}",pseudo_moves);
         let capture_moves: Vec<Move> = pseudo_moves
             .iter()
             .cloned()
             .filter(|mv| mv.classic_move_type == ClassicMoveType::Capture)
             .collect();
+        //log::info!("anti captures {:?}",capture_moves);
         if !capture_moves.is_empty() {
             return capture_moves;
         }
@@ -864,7 +867,8 @@ impl NCheckVariant {
 mod chesscore_test {
     use serde_json::json;
 
-    use crate::chesscore::{Variant, VariantActions};
+    use crate::{Variant,VariantActions};
+
     #[test]
     pub fn setup_variant() {
         let json = json!({

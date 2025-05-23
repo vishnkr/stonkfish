@@ -1,4 +1,5 @@
 use clap::{Arg,Command};
+use sf_engine::Engine;
 use std::time::Instant;
 
 fn main() {
@@ -20,7 +21,7 @@ fn main() {
                  .help("[optional] Run engine on specified depth"))
         .get_matches();
     
-    let mut _engine: stonkfish::Engine = stonkfish::Engine::new(fen);
+    let mut _engine: Engine = Engine::new(fen);
     let _start = Instant::now();
     for _ply in 0..play_until_ply{
 
@@ -30,7 +31,7 @@ fn main() {
 
 #[cfg(test)]
 mod engine_tests{
-    use stonkfish::{Engine,time_it};
+    use sf_engine::{Engine,time_it};
     #[test]
     pub fn test_perft(){
         /*expected (nodes, total_nodes) :
@@ -54,7 +55,7 @@ mod engine_tests{
 
     #[test]
     pub fn test_perft_divide(){
-        let depth = 1;
+        let depth = 4;
         let fen = "r3k3/8/8/8/8/8/8/3K4 b q - 0 1";
         let mut engine = Engine::new(fen.to_string());
         engine.perft_divide(depth);

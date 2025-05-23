@@ -1,9 +1,9 @@
- /*
+ 
 use arrayvec::ArrayVec;
-use crate::engine::{bitboard::{to_pos, to_row, to_col},position::{*, piece::PieceType}};
+use crate::{bitboard::{to_pos, to_row, to_col},position::{*, piece::PieceType}};
 use std::iter::repeat;
 
-type PieceSquareTable = ArrayVec<i8,256>;
+type PieceSquareTable = ArrayVec<i32,256>;
 
 pub struct PieceSquareTables{
     pub king: PieceSquareTable,
@@ -15,7 +15,7 @@ pub struct PieceSquareTables{
 
 }
 
-impl PieceSquareTables{}
+impl PieceSquareTables{
    
     pub fn new(start_pos: &Position)->Self{
         let rook_psqt = Self::setup_piece_sq_table(&start_pos.dimensions,PieceType::Rook);
@@ -30,28 +30,47 @@ impl PieceSquareTables{}
         }
     }
 
-    /pub fn setup_pawn_pqst(start_pos:&Position)->PieceSquareTable{
+    pub fn compute_piece_square_table()-> Vec<i32>{
+        vec![]
+    }
+
+    pub fn setup_pawn_pqst(start_pos:&Position)->PieceSquareTable{
         let width = start_pos.dimensions.width;
         let height = start_pos.dimensions.height;
         let mut pqst:PieceSquareTable = repeat(0).take(256).collect();
-        let kingpos = start_pos.pieces[0].king.bitboard.lowest_one().unwrap() as u8;
+        let kingpos = start_pos.piece_collections[0].get_king().bitboard.lowest_one().unwrap() as u8;
         let kingrow = to_row(kingpos);
         let kingcol = to_col(kingpos);
 
-        //second last rank bonus
-        for j in 0..width-1{
-            pqst[to_pos(1, j)] = 50;
-        }
+        for rank in 0..height{
+            for file in 0..width{
+                let index = rank * width + file;
 
-        let mut advance_point = 15;
-        for i in 2..height-2{
-            for j in 0..width{
-                if (j < kingcol-2 || j>=kingcol){
-                    pqst[to_pos(i, j)] +=advance_point;
-                }
-                
-            }            
-            advance_point-=3;
+                // Encourage advancing pawns
+                let rank_bonus = match rank {
+                    r if r == 0 || r == height - 1 => 0,
+                    r if r == 1 => 50,
+                    r if r == height - 2 => 50,
+                    r if r == 2 => 10 + (file as i32) * 10 / (width as i32),
+                    r if r == height - 3 => 10 + (file as i32) * 10 / (width as i32),
+                    r if r == 3 => 5 + (file as i32) * 5 / (width as i32),
+                    r if r == height - 4 => 5 + (file as i32) * 5 / (width as i32),
+                    _ => 0,
+                };
+    
+                // Penalize unmoved central pawns
+                let central_penalty = if file == width / 2 || file == width / 2 - 1 {
+                    match rank {
+                        0 => -10,
+                        1 => -5,
+                        _ => 0,
+                    }
+                } else {
+                    0
+                };
+                pqst[to_pos(rank,file)] = rank_bonus + central_penalty;
+            }
+            
         }
         pqst
 
@@ -95,26 +114,24 @@ impl PieceSquareTables{}
 
             },
             PieceType::Pawn=>{
-
+                
             }
             _ => {}
         }
         //display_piece_sq_table(&piece_sq_table, &dimensions);
         piece_sq_table
     }
+
 }
 
 pub fn display_piece_sq_table(psqt: &PieceSquareTable,dimensions:&Dimensions){
     let mut count = 0;
-    for i in 0..256{
-        if count>=16{
+    for i in 0..(dimensions.width*dimensions.height){
+        if count>=dimensions.width{
             count = 0;
             println!("");
         }
-        print!("{} ",psqt[i]);
-        if i>126{
-            break
-        }
+        print!("{} ",psqt[i as usize]);
         count+=1;
     }
 }
@@ -125,8 +142,8 @@ mod psqt_tests{
     #[test]
     pub fn test_psqt(){
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string();
-        let position = Position::load_from_fen(fen);
+        let position = Position::new(fen);
         let psqt =  PieceSquareTables::setup_pawn_pqst(&position); 
-        //display_piece_sq_table(&psqt, &position.dimensions)
+        display_piece_sq_table(&psqt, &position.dimensions)
     }
-}*/
+}

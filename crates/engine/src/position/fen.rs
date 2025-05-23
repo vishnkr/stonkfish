@@ -1,6 +1,9 @@
-use crate::engine::bitboard::{Bitboard, to_pos};
 
-use super::{piece_collection::PieceCollection, Dimensions, get_dimensions, Color, Position, piece::Piece, zobrist::Zobrist};
+use crate::bitboard::{to_pos, Bitboard};
+
+use super::{get_dimensions, piece::Piece, piece_collection::PieceCollection, zobrist::Zobrist, Color, Dimensions, Position};
+
+
 
 pub const RADIX: u32 = 10;
 
@@ -91,7 +94,7 @@ pub fn load_from_fen(fen:String) -> Position{
 
 #[cfg(test)]
 mod fen_tests{
-    use crate::engine::position::*;
+    use crate::position::*;
 
     #[test]
     fn test_fen_to_position_conversion(){

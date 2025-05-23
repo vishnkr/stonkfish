@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::ops::Not;
 
-use crate::engine::bitboard::{Bitboard,to_row,to_col};
-use crate::engine::move_generation::moves::*;
+use crate::bitboard::{Bitboard,to_row,to_col};
+use crate::move_generation::moves::*;
 
 use self::fen::{RADIX, load_from_fen};
 use self::piece::{Piece,PieceType, PieceRepr};
@@ -286,7 +286,7 @@ impl Position{
 
 #[cfg(test)]
 mod position_tests{
-    use crate::engine::position::*;
+    use crate::position::*;
 
     #[test]
     fn test_eq_zobrist_hash(){

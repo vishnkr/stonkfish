@@ -1,4 +1,4 @@
-use crate::engine::{move_generation::moves::{Move,MType}, position::zobrist::ZobristKey};
+use crate::{move_generation::moves::{Move,MType}, position::zobrist::ZobristKey};
 
 const ENTRIES_PER_BUCKET: usize = 4;
 

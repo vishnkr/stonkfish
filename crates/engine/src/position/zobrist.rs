@@ -1,4 +1,4 @@
-use crate::engine::position::*;
+use crate::position::*;
 use std::{collections::HashMap};
 use rand::{SeedableRng, Rng, rngs::StdRng};
 

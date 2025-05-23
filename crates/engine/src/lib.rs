@@ -1,11 +1,18 @@
 extern crate cfg_if;
 use cfg_if::cfg_if;
+use chesscore::{Variant, VariantActions};
+use chesscore::Color;
 use wasm_bindgen::prelude::*;
 
-pub mod chesscore;
-pub mod engine;
-use chesscore::{Variant, VariantActions};
-use engine::{
+pub mod evaluation;
+pub mod position;
+pub mod stats;
+pub mod transposition;
+pub mod move_generation;
+pub mod utils;
+pub mod bitboard;
+
+use crate::{
     evaluation::Evaluator,
     move_generation::{generate_legal_moves, moves::*, MoveGenerator},
     position::Position,
@@ -14,7 +21,6 @@ use engine::{
 };
 use serde::Serialize;
 extern crate console_error_panic_hook;
-use crate::chesscore::Color;
 
 
 cfg_if! {
@@ -60,6 +66,7 @@ struct EngineMoveJSON {
     mtype: String,
 }
 
+
 macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
@@ -81,6 +88,7 @@ impl ChessCoreLib {
     #[wasm_bindgen(constructor)]
     pub fn new(config: String) -> Self {
         console_error_panic_hook::set_once();
+        wasm_logger::init(wasm_logger::Config::default());
         ChessCoreLib {
             chesscore: ChessCore::new(config),
         }
@@ -140,13 +148,13 @@ const TEST_TT_SIZE: usize = 254288000;
 
 impl Engine {
     pub fn new(fen: String) -> Engine {
-        let position: Position = Position::new(fen);
+        let mut position: Position = Position::new(fen);
         Engine {
             move_generator: MoveGenerator::new(
                 position.dimensions.clone(),
                 position.get_jump_offets(),
             ),
-            evaluator: Evaluator {}, //Evaluator::new(&position),
+            evaluator: Evaluator::new(&mut position),
             position: position,
             transposition_table: TranspositionTable::new(TEST_TT_SIZE),
             stats: Stats::new(),
@@ -282,7 +290,7 @@ impl Engine {
 #[cfg(test)]
 mod engine_tests {
     use crate::{time_it, Engine};
-
+    
     #[test]
     pub fn test_standard_pos() {
         let depth = 3;

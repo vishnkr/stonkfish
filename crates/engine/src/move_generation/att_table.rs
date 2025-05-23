@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use std::collections::HashMap;
-use crate::engine::{
+use crate::{
     bitboard::{Bitboard,to_pos,to_row,to_col},
     position::Color,
     utils::get_rank_attacks,

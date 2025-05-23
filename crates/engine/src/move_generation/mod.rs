@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use moves::*;
-use crate::engine::{
+use crate::{
     bitboard::*,
     position::{*, piece::Piece},
 };
@@ -196,7 +196,6 @@ impl MoveGenerator{
     }
     
     pub fn is_legal_move(&self,position:&mut Position, mv: &Move)->bool{
-        
         let mut is_under_check = false;
         let turn = position.turn;
         position.make_move(mv);
