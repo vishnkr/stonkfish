@@ -25,7 +25,7 @@ async fn main() {
     let state = Arc::new(Mutex::new(tx));
     // Build the Axum application
     let app = Router::new()
-        .route("/ws", get({
+        .route("/play/", get({
             let state: Arc<Mutex<broadcast::Sender<String>>> = state.clone();
             move |ws: WebSocketUpgrade| ws_handler(ws, state.clone())
         }));

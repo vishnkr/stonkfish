@@ -2,10 +2,9 @@ use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::models::Player;
 
 pub struct Game {
-    pub players: DashMap<String, Player>,
+    pub players: DashMap<String, String>,
 }
 
 #[derive(Clone)]

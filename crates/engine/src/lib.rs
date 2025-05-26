@@ -3,6 +3,7 @@ use cfg_if::cfg_if;
 use chesscore::{Variant, VariantActions};
 use chesscore::Color;
 use wasm_bindgen::prelude::*;
+use sf_chess::Bitboard;
 
 pub mod evaluation;
 pub mod position;
@@ -10,7 +11,7 @@ pub mod stats;
 pub mod transposition;
 pub mod move_generation;
 pub mod utils;
-pub mod bitboard;
+
 
 use crate::{
     evaluation::Evaluator,

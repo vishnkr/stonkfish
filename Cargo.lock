@@ -1065,6 +1065,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sf-chess"
+version = "0.0.0"
+dependencies = [
+ "numext-fixed-uint",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "sf-engine"
 version = "0.1.0"
 dependencies = [
@@ -1082,6 +1091,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "sf-chess",
  "wasm-bindgen",
  "wasm-bindgen-rayon",
  "wasm-bindgen-test",

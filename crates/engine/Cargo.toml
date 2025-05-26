@@ -17,6 +17,7 @@ wasm-bindgen = [ "instant/wasm-bindgen" ]
 
 [dependencies]
 chesscore = { path = "../chesscore" }
+sf-chess = { path = "../chess" }
 numext-fixed-uint = "0.1.6"
 cfg-if = "1.0.0"
 wasm-bindgen = "0.2.63"

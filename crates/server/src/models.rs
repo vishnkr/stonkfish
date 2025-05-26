@@ -3,9 +3,18 @@ use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
-#[derive(Debug, Deserialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WSMessage {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthResponse {
-    pub userId: String,
+    #[serde(rename = "userId")]
+    pub user_id: String,
     pub username: String,
 }
 
@@ -35,10 +44,3 @@ pub struct Event {
     pub d: serde_json::Value,
 }
 
-#[derive(Clone)]
-pub struct Player {
-    pub user_id: String,
-    pub game_id: String,
-    pub color_pref: Option<String>,
-    //pub sender: UnboundedSender<tungstenite::Message>,
-}

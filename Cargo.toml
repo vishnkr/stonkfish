@@ -3,4 +3,5 @@ members = [
     "crates/chesscore",
     "crates/engine",
     "crates/server",
+    "crates/chess"
 ]
