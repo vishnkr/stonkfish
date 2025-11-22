@@ -1,0 +1,19 @@
+[package]
+name = "sf-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tokio-tungstenite = "*"
+futures = "0.3"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+hyper = { version = "1", features = ["full"] }
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dashmap = "5"
+uuid = { version = "1", features = ["v4"] }
+chesscore = { path = "../chesscore" }   

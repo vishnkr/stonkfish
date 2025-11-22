@@ -1,0 +1,9 @@
+[package]
+name = "sf_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tinyvec = "1"          # useful for move lists
+arrayvec = "0.7"       # optional, for perf later
+serde = { version = "1", features = ["derive"], optional = true }

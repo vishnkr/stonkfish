@@ -1,0 +1,7 @@
+[package]
+name = "sf_variant"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sf_core = { path = "../core" }

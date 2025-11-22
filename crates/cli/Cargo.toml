@@ -1,0 +1,10 @@
+[package]
+name = "sf_cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sf_core = { path = "../core" }
+sf_variant = { path = "../variant" }
+sf_engine = { path = "../engine" }
+clap = { version = "4", features = ["derive"] }
