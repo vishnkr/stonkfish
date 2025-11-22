@@ -1,11 +1,12 @@
 [package]
-name = "sf-chess"
+name = "sf-core"
 edition = "2021"
 
 [lib]
-name = "sf_chess"
+name = "sf_core"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = {version = "1.0.48"}
 numext-fixed-uint = "0.1.6"
+lazy_static = "1.4.0"

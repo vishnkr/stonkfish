@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "crates/chesscore",
     "crates/engine",
-    "crates/server",
-    "crates/chess"
+    "crates/variant",
+    "crates/cli",
+    "crates/core",
+    "crates/wasm"
 ]

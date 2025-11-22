@@ -4,6 +4,95 @@ use crate::types::Dimensions;
 
 use core::ops::*;
 
+
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BitBoard {
+    B64(u64),
+    B256(U256),
+}
+
+impl BitBoard {
+    pub fn zero(size: usize) -> Self {
+        match size {
+            0..=64 => BitBoard::B64(0),
+            65..=256 => BitBoard::B256(U256::zero()),
+            _ => panic!("Unsupported size"),
+        }
+    }
+
+    pub fn set_bit(&mut self, index: usize, value: bool) -> bool {
+        match self {
+            BitBoard::B64(ref mut val) => {
+                if index >= 64 { return false; }
+                if value {
+                    *val |= 1 << index;
+                } else {
+                    *val &= !(1 << index);
+                }
+                true
+            },
+            BitBoard::B256(ref mut val) => val.set_bit(index, value),
+        }
+    }
+
+    pub fn bit(&self, index: usize) -> Option<bool> {
+        match self {
+            BitBoard::B64(val) => {
+                if index >= 64 { None } else { Some((*val & (1 << index)) != 0) }
+            },
+            BitBoard::B256(val) => val.bit(index),
+        }
+    }
+
+    pub fn lsb(&self) -> usize {
+        match self {
+            BitBoard::B64(x) => x.trailing_zeros() as usize,
+            BitBoard::B256(x) => x.trailing_zeros() as usize,
+        }
+    }
+
+    pub fn msb(&self) -> usize {
+        match self {
+            BitBoard::B64(x) => 63 - x.leading_zeros() as usize,
+            BitBoard::B256(x) => 255 - x.leading_zeros() as usize,
+        }
+    }
+}
+
+impl std::ops::BitAnd for &BitBoard {
+    type Output = BitBoard;
+    fn bitand(self, rhs: Self) -> BitBoard {
+        match (self, rhs) {
+            (BitBoard::B64(a), BitBoard::B64(b)) => BitBoard::B64(a & b),
+            (BitBoard::B256(a), BitBoard::B256(b)) => BitBoard::B256(*a & *b),
+            _ => panic!("Mismatched bitboard types"),
+        }
+    }
+}
+
+impl std::ops::BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = match (self.clone(), rhs) {
+            (BitBoard::B64(a), BitBoard::B64(b)) => BitBoard::B64(a & b),
+            (BitBoard::B256(a), BitBoard::B256(b)) => BitBoard::B256(a & b),
+            _ => panic!("Mismatched bitboard types"),
+        };
+    }
+}
+
+impl std::ops::Not for &BitBoard {
+    type Output = BitBoard;
+    fn not(self) -> BitBoard {
+        match self {
+            BitBoard::B64(a) => BitBoard::B64(!a),
+            BitBoard::B256(a) => BitBoard::B256(!*a),
+        }
+    }
+}
+
+
+/* 
 pub trait BitBoard:
     Sized
     + Clone
@@ -411,4 +500,6 @@ impl<T: BitBoard> SizeDependentBitboards<T> {
         }
         SizeDependentBitboards { full_bitboard, row_boundary , col_boundary}
     }
-}
+}*/
+
+
