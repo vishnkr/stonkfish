@@ -88,7 +88,7 @@ impl BB for BitBoard64 {
 }
 
 /// Simple U256 implementation using [u64; 4]
-/// This allows us to support boards up to 256 squares without external dependencies
+/// This allows us to support boards up to 256 squares
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct U256([u64; 4]);
 
@@ -124,12 +124,12 @@ impl U256 {
         let mut result = [0u64; 4];
         
         if bit_shift == 0 {
-            // Simple word shift
+            // word shift
             for i in word_shift..4 {
                 result[i - word_shift] = self.0[i];
             }
         } else {
-            // Bit shift across words
+            // bit shift across words
             for i in word_shift..4 {
                 let src_idx = i;
                 let dst_idx = i - word_shift;
@@ -216,7 +216,6 @@ impl std::ops::Shl<u16> for U256 {
     }
 }
 
-/// BitBoard256 - u256 implementation for boards with more than 64 squares
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BitBoard256(U256);
 
@@ -298,8 +297,6 @@ impl BB for BitBoard256 {
     }
 }
 
-/// BitBoard - automatically selects BitBoard64 or BitBoard256 based on board size
-/// This is the type that consumers should use - they don't need to know which implementation is used
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BitBoard {
     Small(BitBoard64),
@@ -307,8 +304,6 @@ pub enum BitBoard {
 }
 
 impl BitBoard {
-    /// Create a BitBoard based on board dimensions
-    /// Uses BitBoard64 for boards <= 64 squares, BitBoard256 for larger boards
     pub fn for_dims(dims: &Dimensions) -> Self {
         if dims.num_squares() <= 64 {
             BitBoard::Small(BitBoard64::empty())
@@ -317,12 +312,10 @@ impl BitBoard {
         }
     }
     
-    /// Create empty bitboard (requires dimensions to determine type)
     pub fn empty_for_dims(dims: &Dimensions) -> Self {
         Self::for_dims(dims)
     }
     
-    /// Create full bitboard (requires dimensions to determine type)
     pub fn full_for_dims(dims: &Dimensions) -> Self {
         if dims.num_squares() <= 64 {
             BitBoard::Small(BitBoard64::full())
@@ -334,8 +327,7 @@ impl BitBoard {
 
 impl BB for BitBoard {
     fn empty() -> Self {
-        // Default to small for backward compatibility
-        // In practice, use empty_for_dims() with dimensions
+
         BitBoard::Small(BitBoard64::empty())
     }
     
@@ -344,8 +336,6 @@ impl BB for BitBoard {
     }
     
     fn from_square(sq: Square) -> Self {
-        // Default to small - this should ideally take dimensions
-        // For now, assume small boards
         BitBoard::Small(BitBoard64::from_square(sq))
     }
     
